@@ -1,0 +1,44 @@
+package com.cricket.tournament.model;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Entity
+@Table(name = "batting_performances")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class BattingPerformance {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "match_id")
+    private Match match;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player_id")
+    private Player player;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
+    private int runs = 0;
+    private int balls = 0;
+    private int fours = 0;
+    private int sixes = 0;
+    private boolean isOut = false;
+    private String dismissalType; // BOWLED, CAUGHT, LBW, RUN_OUT, STUMPED, NOT_OUT, etc.
+    private int battingOrder;
+    private String inningsType; // FIRST or SECOND
+
+    public double getStrikeRate() {
+        if (balls == 0) return 0;
+        return Math.round((double) runs / balls * 10000.0) / 100.0;
+    }
+}
