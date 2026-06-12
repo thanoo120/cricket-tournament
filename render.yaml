@@ -23,7 +23,7 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         value: "https://tsauok.com,https://www.tsauok.com"
       - key: JWT_SECRET
-        value: T5aUoK#cRiCkEt$2026!xQpLmNbVzJwRdYhSgFkTeAoIuCnMxBqPlWs
+        value: T5aUoKcRiCkEt2026xQpLmNbVzJwRdYhSgFkTeAoIuCnMxBqPlWsAbCdEfGh
       - key: JWT_EXPIRATION_MS
         value: "86400000"
       - key: ADMIN_USERNAME
