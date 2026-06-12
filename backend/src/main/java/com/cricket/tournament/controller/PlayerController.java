@@ -1,4 +1,4 @@
-﻿package com.cricket.tournament.controller;
+package com.cricket.tournament.controller;
 
 import com.cricket.tournament.dto.DTOs.*;
 import com.cricket.tournament.service.PlayerService;
