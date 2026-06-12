@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getMatch, getScorecard, getBalls, subscribeToMatch } from '../services/api';
 
@@ -34,6 +34,7 @@ export default function LiveMatchView() {
     return () => {
       if (esRef.current) esRef.current.close();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) return <div className="loading"><div className="spinner" /><span>Loading live match...</span></div>;
@@ -53,7 +54,6 @@ export default function LiveMatchView() {
         {Array.from({ length: maxOvers }, (_, i) => i + 1).map(ov => {
           const ovBalls = inningsBalls.filter(b => b.overNumber === ov);
           if (!ovBalls.length) return null;
-          const legalBalls = ovBalls.filter(b => !b.wide && !b.noBall);
           const runs = ovBalls.reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0);
           const wkts = ovBalls.filter(b => b.wicket).length;
           return (

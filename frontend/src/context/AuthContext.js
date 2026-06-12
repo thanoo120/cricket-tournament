@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
       const u = { username: username.toLowerCase(), role: cred.role, name: cred.name };
       setUser(u);
       localStorage.setItem('cric_user', JSON.stringify(u));
-      return { ok: true };
+      return { ok: true, role: cred.role };
     }
     return { ok: false, error: 'Invalid username or password' };
   };

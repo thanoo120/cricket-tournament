@@ -47,8 +47,8 @@ export default function MatchDetail() {
 
   return (
     <div>
-      <div className="top-bar">
-        <span className="top-bar-title">Match Detail</span>
+      <div className="page-header">
+        <span className="page-header-title">Match Detail</span>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" onClick={() => setShowBattingModal(true)}>+ Batting</button>
           <button className="btn btn-secondary" onClick={() => setShowBowlingModal(true)}>+ Bowling</button>

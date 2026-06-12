@@ -1,4 +1,4 @@
-package com.cricket.tournament.controller;
+﻿package com.cricket.tournament.controller;
 
 import com.cricket.tournament.dto.DTOs.*;
 import com.cricket.tournament.service.MatchService;
@@ -14,7 +14,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/matches")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class MatchController {
 
     private final MatchService matchService;

@@ -47,14 +47,14 @@ export default function Tournaments() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Tournaments</div>
-            <div className="top-bar-sub">{tournaments.length} total · {ongoing.length} active</div>
+            <div className="page-header-title">Tournaments</div>
+            <div className="page-header-sub">{tournaments.length} total · {ongoing.length} active</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {isAdmin && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create Tournament</button>
           )}

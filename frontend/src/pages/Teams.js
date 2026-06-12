@@ -42,14 +42,14 @@ export default function Teams({ readOnly }) {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Teams</div>
-            {tournament && <div className="top-bar-sub">{tournament.name}</div>}
+            <div className="page-header-title">Teams</div>
+            {tournament && <div className="page-header-sub">{tournament.name}</div>}
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {canEdit && <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ Add Team</button>}
         </div>
       </div>

@@ -127,11 +127,11 @@ export default function Scorecard() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
-          <div className="top-bar-title">Official Scorecard</div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="page-header-title">Official Scorecard</div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           <Link to="/fixtures" className="btn btn-ghost btn-sm">← All Matches</Link>
         </div>
       </div>

@@ -96,14 +96,14 @@ export default function PublicDashboard() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Live Tournament Dashboard</div>
-            <div className="top-bar-sub">Official scores, stats & standings</div>
+            <div className="page-header-title">Live Tournament Dashboard</div>
+            <div className="page-header-sub">Official scores, stats & standings</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {tournaments.length > 1 && tournaments.map(t => (
             <button key={t.id}
               className={`btn btn-sm ${activeTid === t.id ? 'btn-primary' : 'btn-ghost'}`}

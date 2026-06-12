@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   getMatch, updateScore, getScorecard, addBattingPerformance, addBowlingPerformance,
@@ -411,6 +411,7 @@ export default function LiveScoring() {
             <div className="lc-panel-header"><span className="lc-panel-label">Overs Summary</span></div>
             <div style={{ padding: '8px 14px' }}>
               {Array.from({ length: maxOvers }, (_, i) => i + 1).map(ov => {
+                // eslint-disable-next-line no-unused-vars
                 const ovBalls = activeBalls.filter(b => b.overNumber === ov && !b.wide && !b.noBall);
                 const runs = activeBalls.filter(b => b.overNumber === ov).reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0);
                 const wkts = activeBalls.filter(b => b.overNumber === ov && b.wicket).length;

@@ -20,6 +20,7 @@ export default function AdminMatches() {
   useEffect(() => {
     load();
     getTeams(id).then(r => setTeams(r.data));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const load = () => getMatches(id).then(r => setMatches(r.data));
@@ -42,12 +43,8 @@ export default function AdminMatches() {
   const filtered = filter === 'ALL' ? matches : matches.filter(m => m.status === filter);
   const liveMatch = matches.find(m => m.status === 'LIVE');
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
-  const upcomingMatches = matches.filter(m => m.status === 'SCHEDULED');
   const earlierMatches = completedMatches.slice(-5).reverse();
 
-  const displayMatches = filter === 'ALL'
-    ? filtered.filter(m => m.status !== 'COMPLETED' || completedMatches.indexOf(m) >= completedMatches.length - 2)
-    : filtered;
 
   return (
     <div>

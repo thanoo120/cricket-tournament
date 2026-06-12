@@ -2,11 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getTeams, getTopBatsmen, getTopBowlers, getTournament } from '../services/api';
 
-function calcNRR(teams, matches) {
-  // NRR = (Total runs scored / Total overs faced) - (Total runs conceded / Total overs bowled)
-  // We calculate from team stats already stored
-  return teams;
-}
 
 export default function Leaderboard() {
   const { id } = useParams();
@@ -38,11 +33,11 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Standings & Stats</div>
-            {tournament && <div className="top-bar-sub">{tournament.name}</div>}
+            <div className="page-header-title">Standings & Stats</div>
+            {tournament && <div className="page-header-sub">{tournament.name}</div>}
           </div>
         </div>
       </div>

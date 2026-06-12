@@ -69,14 +69,14 @@ export default function Fixtures() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Match Fixtures</div>
-            <div className="top-bar-sub">Schedule, results & live matches</div>
+            <div className="page-header-title">Match Fixtures</div>
+            <div className="page-header-sub">Schedule, results & live matches</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {tournaments.map(t => (
             <button key={t.id}
               className={`btn btn-sm ${activeTid === t.id ? 'btn-primary' : 'btn-ghost'}`}

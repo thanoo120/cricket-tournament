@@ -56,11 +56,11 @@ export default function Players({ readOnly }) {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
-          <div className="top-bar-title">Players & Stats</div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="page-header-title">Players & Stats</div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {canEdit && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Add Player</button>
           )}

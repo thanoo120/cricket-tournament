@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -7,8 +7,13 @@ export default function Login() {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  // Already logged in — bounce to appropriate dashboard
+  if (isAuthenticated) {
+    return <Navigate to={isAdmin ? '/admin/dashboard' : '/admin/scorer'} replace />;
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,7 +22,7 @@ export default function Login() {
     setTimeout(() => {
       const result = login(form.username, form.password);
       if (result.ok) {
-        navigate('/admin/dashboard');
+        navigate(result.role === 'SCORER' ? '/admin/scorer' : '/admin/dashboard');
       } else {
         setError(result.error);
       }
@@ -96,11 +101,11 @@ export default function Login() {
         </div>
 
         <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <a href="/dashboard" style={{ fontSize: 12, color: 'var(--text-3)', transition: 'color 0.15s' }}
+          <Link to="/dashboard" style={{ fontSize: 12, color: 'var(--text-3)', transition: 'color 0.15s' }}
             onMouseOver={e => e.target.style.color = 'var(--accent)'}
             onMouseOut={e => e.target.style.color = 'var(--text-3)'}>
-            View public dashboard →
-          </a>
+            ← Back to public dashboard
+          </Link>
         </div>
       </div>
     </div>

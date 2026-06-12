@@ -38,8 +38,8 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Default: public results page */}
+          <Route path="/" element={<PublicLayout><PublicDashboard /></PublicLayout>} />
 
           {/* Auth */}
           <Route path="/login" element={<Login />} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { getTournaments, getMatches, getTournamentStats, updateTournamentStatus } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,7 +9,6 @@ export default function AdminDashboard() {
   const [liveMatches, setLiveMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAdmin } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => { load(); }, []);
 
@@ -41,14 +40,14 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Admin Dashboard</div>
-            <div className="top-bar-sub">Welcome back, {user?.name}</div>
+            <div className="page-header-title">Admin Dashboard</div>
+            <div className="page-header-sub">Welcome back, {user?.name}</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {isAdmin && (
             <Link to="/admin/tournaments" className="btn btn-primary">
               + New Tournament

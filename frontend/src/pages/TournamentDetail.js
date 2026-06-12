@@ -33,14 +33,14 @@ export default function TournamentDetail({ admin }) {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">{tournament.name}</div>
-            <div className="top-bar-sub">📍 {tournament.location} · {tournament.startDate} to {tournament.endDate}</div>
+            <div className="page-header-title">{tournament.name}</div>
+            <div className="page-header-sub">📍 {tournament.location} · {tournament.startDate} to {tournament.endDate}</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           <span className={`badge badge-${tournament.status.toLowerCase()}`}>{tournament.status}</span>
         </div>
       </div>
