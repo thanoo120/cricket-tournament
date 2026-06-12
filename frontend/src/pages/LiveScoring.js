@@ -208,7 +208,7 @@ export default function LiveScoring() {
     setSaving(false);
   };
 
-  // ”€”€”€ Fixture selector screen ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // --- Fixture selector screen ---
   if (!id) {
     const liveOrScheduled = allMatches.filter(m => m.status === 'LIVE' || m.status === 'SCHEDULED');
     return (
@@ -346,7 +346,7 @@ export default function LiveScoring() {
               </div>
               {strikeBatsman && currentBowler && (
                 <div style={{ marginTop: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-                  Over {currentOver}.{ballInOver - 1} "” Ready to score
+                  Over {currentOver}.{ballInOver - 1} — Ready to score
                 </div>
               )}
             </div>
@@ -355,7 +355,7 @@ export default function LiveScoring() {
           {/* Ball Pad */}
           {isLive && (
             <div className="lc-panel">
-              <div className="lc-panel-header"><span className="lc-panel-label">Record Ball "” Over {currentOver}, Ball {ballInOver}</span></div>
+              <div className="lc-panel-header"><span className="lc-panel-label">Record Ball — Over {currentOver}, Ball {ballInOver}</span></div>
               <div className="add-event-pad">
                 <div className="event-grid">
                   {[0, 1, 2, 3].map(r => (
@@ -430,7 +430,7 @@ export default function LiveScoring() {
                     <span style={{ minWidth: 52, color: 'var(--text-2)', fontWeight: 600 }}>Over {ov}</span>
                     <div style={{ display: 'flex', gap: 3 }}>
                       {Array.from({ length: 6 }, (_, j) => {
-                        const b = activeBalls.filter(x => x.overNumber === ov && !x.isWide && !x.isNoBall)[j];
+                        const b = activeBalls.filter(x => x.overNumber === ov && !x.wide && !x.noBall)[j];
                         if (!b) return <div key={j} className="over-ball" style={{ width: 20, height: 20, fontSize: 10, opacity: 0.3 }}>-</div>;
                         return (
                           <div key={j} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : ''}`} style={{ width: 20, height: 20, fontSize: 10 }}>
@@ -578,13 +578,13 @@ export default function LiveScoring() {
                     </select>
                   </div>
                 </div>
-                <div className="divider-label">1st Innings "” {match.team1Name}</div>
+                <div className="divider-label">1st Innings — {match.team1Name}</div>
                 <div className="form-row-3">
                   <div className="form-group"><label className="form-label">Score</label><input className="form-input" type="number" min="0" value={scoreForm.team1Score} onChange={e => setScoreForm(f => ({ ...f, team1Score: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Wickets</label><input className="form-input" type="number" min="0" max="10" value={scoreForm.team1Wickets} onChange={e => setScoreForm(f => ({ ...f, team1Wickets: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Overs</label><input className="form-input" type="number" step="0.1" min="0" value={scoreForm.team1Overs} onChange={e => setScoreForm(f => ({ ...f, team1Overs: e.target.value }))} /></div>
                 </div>
-                <div className="divider-label">2nd Innings "” {match.team2Name}</div>
+                <div className="divider-label">2nd Innings — {match.team2Name}</div>
                 <div className="form-row-3">
                   <div className="form-group"><label className="form-label">Score</label><input className="form-input" type="number" min="0" value={scoreForm.team2Score} onChange={e => setScoreForm(f => ({ ...f, team2Score: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Wickets</label><input className="form-input" type="number" min="0" max="10" value={scoreForm.team2Wickets} onChange={e => setScoreForm(f => ({ ...f, team2Wickets: e.target.value }))} /></div>
@@ -597,7 +597,7 @@ export default function LiveScoring() {
                       <div className="form-group">
                         <label className="form-label">Winner</label>
                         <select className="form-select" value={scoreForm.winnerId} onChange={e => setScoreForm(f => ({ ...f, winnerId: e.target.value }))}>
-                          <option value="">"” No result / Tie "”</option>
+                          <option value="">— No result / Tie —</option>
                           <option value={match.team1Id}>{match.team1Name}</option>
                           <option value={match.team2Id}>{match.team2Name}</option>
                         </select>
@@ -605,7 +605,7 @@ export default function LiveScoring() {
                       <div className="form-group">
                         <label className="form-label">Player of the Match</label>
                         <select className="form-select" value={scoreForm.playerOfMatchId} onChange={e => setScoreForm(f => ({ ...f, playerOfMatchId: e.target.value }))}>
-                          <option value="">"” Select player "”</option>
+                          <option value="">— Select player —</option>
                           {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                       </div>
@@ -637,7 +637,7 @@ export default function LiveScoring() {
                   <div className="form-group">
                     <label className="form-label">Batter</label>
                     <select className="form-select" required value={batForm.playerId} onChange={e => setBatForm(f => ({ ...f, playerId: e.target.value }))}>
-                      <option value="">"” Select "”</option>
+                      <option value="">— Select —</option>
                       {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
@@ -690,7 +690,7 @@ export default function LiveScoring() {
                   <div className="form-group">
                     <label className="form-label">Bowler</label>
                     <select className="form-select" required value={bowlForm.playerId} onChange={e => setBowlForm(f => ({ ...f, playerId: e.target.value }))}>
-                      <option value="">"” Select "”</option>
+                      <option value="">— Select —</option>
                       {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>

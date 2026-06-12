@@ -15,19 +15,22 @@ export default function Login() {
     return <Navigate to={isAdmin ? '/admin/dashboard' : '/admin/tournaments'} replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setTimeout(() => {
-      const result = login(form.username, form.password);
+    try {
+      const result = await login(form.username, form.password);
       if (result.ok) {
         navigate(result.role === 'SCORER' ? '/admin/tournaments' : '/admin/dashboard');
-      } else {
-        setError(result.error);
       }
+    } catch (err) {
+      setError(
+        err.response?.data?.error || 'Invalid username or password'
+      );
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (
