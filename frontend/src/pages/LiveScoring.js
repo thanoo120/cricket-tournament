@@ -65,8 +65,8 @@ export default function LiveScoring() {
     if (!id) return;
     loadMatchData(id);
     getMatch(id).then(mr => {
-      getPlayers(mr.data.team1Id).then(r => setTeam1Players(r.data));
-      getPlayers(mr.data.team2Id).then(r => setTeam2Players(r.data));
+      getPlayers(mr.data.team1Id).then(r => setTeam1Players(r.data || []));
+      getPlayers(mr.data.team2Id).then(r => setTeam2Players(r.data || []));
     });
   }, [id, loadMatchData]);
 

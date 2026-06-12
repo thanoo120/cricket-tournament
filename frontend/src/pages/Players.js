@@ -24,25 +24,26 @@ export default function Players({ readOnly }) {
 
   useEffect(() => {
     getTeams(id).then(r => {
-      setTeams(r.data);
-      if (r.data.length > 0) {
+      const data = r.data || [];
+      setTeams(data);
+      if (data.length > 0) {
         setSelectedTeam(String(r.data[0].id));
         setForm(f => ({ ...f, teamId: String(r.data[0].id) }));
       }
     });
-    getTopBatsmen(id).then(r => setTopBatsmen(r.data));
-    getTopBowlers(id).then(r => setTopBowlers(r.data));
+    getTopBatsmen(id).then(r => setTopBatsmen(r.data || []));
+    getTopBowlers(id).then(r => setTopBowlers(r.data || []));
   }, [id]);
 
   useEffect(() => {
-    if (selectedTeam) getPlayers(selectedTeam).then(r => setPlayers(r.data));
+    if (selectedTeam) getPlayers(selectedTeam).then(r => setPlayers(r.data || []));
   }, [selectedTeam]);
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
     await createPlayer({ ...form, teamId: parseInt(form.teamId, 10) });
     setShowModal(false);
-    if (selectedTeam) getPlayers(selectedTeam).then(r => setPlayers(r.data));
+    if (selectedTeam) getPlayers(selectedTeam).then(r => setPlayers(r.data || []));
     setSaving(false);
   };
 

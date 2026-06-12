@@ -45,7 +45,7 @@ export default function AdminMatches() {
 
   useEffect(() => {
     load();
-    getTeams(id).then(r => setTeams(r.data));
+    getTeams(id).then(r => setTeams(r.data || []));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

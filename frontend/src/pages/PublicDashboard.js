@@ -148,7 +148,7 @@ export default function PublicDashboard() {
 
   useEffect(() => {
     getTournaments().then(res => {
-      const ts = res.data;
+      const ts = Array.isArray(res.data) ? res.data : [];
       setTournaments(ts);
       const ongoing = ts.find(t => t.status === 'ONGOING') || ts[0];
       if (ongoing) {
@@ -168,10 +168,11 @@ export default function PublicDashboard() {
     const interval = setInterval(() => {
       getMatches(activeTid).then(r => {
         setAllMatches(prev => {
+          const next = Array.isArray(r.data) ? r.data : prev;
           const hadLive = prev.some(m => m.status === 'LIVE');
-          const hasLive = r.data.some(m => m.status === 'LIVE');
+          const hasLive = next.some(m => m.status === 'LIVE');
           if (!hadLive && hasLive) setTab('live');
-          return r.data;
+          return next;
         });
       }).catch(() => {});
     }, 30000);
@@ -182,10 +183,10 @@ export default function PublicDashboard() {
     setLoading(true);
     Promise.all([getMatches(tid), getTournamentStats(tid), getTopBatsmen(tid), getTopBowlers(tid)])
       .then(([m, s, b, bw]) => {
-        setAllMatches(m.data);
+        setAllMatches(Array.isArray(m.data) ? m.data : []);
         setStats(s.data);
-        setBatsmen(b.data.slice(0, 5));
-        setBowlers(bw.data.slice(0, 5));
+        setBatsmen(Array.isArray(b.data) ? b.data.slice(0, 5) : []);
+        setBowlers(Array.isArray(bw.data) ? bw.data.slice(0, 5) : []);
         setLoading(false);
       }).catch(() => setLoading(false));
   };

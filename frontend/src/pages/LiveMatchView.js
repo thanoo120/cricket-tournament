@@ -157,7 +157,7 @@ export default function LiveMatchView() {
               {[
                 { label: match.team1Name, innings: innings1 },
                 { label: match.team2Name, innings: innings2 },
-              ].map(({ label, innings }) => innings && (
+              ].map(({ label, innings }) => innings?.batting?.length > 0 && (
                 <div key={label} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--card-border)' }}>{label}</div>
                   <div className="sc-table-wrap">
