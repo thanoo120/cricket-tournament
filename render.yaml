@@ -3,7 +3,6 @@ services:
     name: cricket-tournament-backend
     runtime: docker
     dockerfilePath: backend/Dockerfile
-    dockerContext: backend
     envVars:
       - key: PORT
         value: "8080"
