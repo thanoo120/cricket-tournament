@@ -47,14 +47,14 @@ export default function Tournaments() {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
+      <div className="page-header">
+        <div className="page-header-left">
           <div>
-            <div className="top-bar-title">Tournaments</div>
-            <div className="top-bar-sub">{tournaments.length} total · {ongoing.length} active</div>
+            <div className="page-header-title">Tournaments</div>
+            <div className="page-header-sub">{tournaments.length} total · {ongoing.length} active</div>
           </div>
         </div>
-        <div className="top-bar-right">
+        <div className="page-header-right">
           {isAdmin && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create Tournament</button>
           )}
@@ -137,9 +137,11 @@ export default function Tournaments() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <Link to={`/admin/tournaments/${t.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
-                      Manage
-                    </Link>
+                    {isAdmin && (
+                      <Link to={`/admin/tournaments/${t.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                        Manage
+                      </Link>
+                    )}
                     <Link to={`/admin/tournaments/${t.id}/matches`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
                       Matches
                     </Link>

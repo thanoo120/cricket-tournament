@@ -1,6 +1,7 @@
 package com.cricket.tournament.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -11,10 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
+@RequiredArgsConstructor
 public class SseService {
 
+    // Inject Spring's configured ObjectMapper so Java Time types (LocalDateTime, etc.) serialize correctly
+    private final ObjectMapper mapper;
+
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
-    private final ObjectMapper mapper = new ObjectMapper();
 
     public SseEmitter subscribe(Long matchId) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);

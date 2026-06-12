@@ -27,9 +27,9 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="top-bar">
-        <span className="top-bar-title">Dashboard</span>
-        <div className="top-bar-right">
+      <div className="page-header">
+        <span className="page-header-title">Dashboard</span>
+        <div className="page-header-right">
           <Link to="/tournaments" className="btn btn-primary">+ New Tournament</Link>
         </div>
       </div>

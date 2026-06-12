@@ -1,29 +1,30 @@
 import React, { createContext, useContext, useState } from 'react';
+import { loginApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
-const CREDENTIALS = {
-  admin: { password: 'cricket@2025', role: 'ADMIN', name: 'Administrator' },
-  scorer: { password: 'scorer@2025', role: 'SCORER', name: 'Match Scorer' },
-};
+function loadUser() {
+  try { return JSON.parse(localStorage.getItem('cric_user')); } catch { return null; }
+}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('cric_user')); } catch { return null; }
-  });
+  const [user, setUser] = useState(loadUser);
 
-  const login = (username, password) => {
-    const cred = CREDENTIALS[username.toLowerCase()];
-    if (cred && cred.password === password) {
-      const u = { username: username.toLowerCase(), role: cred.role, name: cred.name };
-      setUser(u);
-      localStorage.setItem('cric_user', JSON.stringify(u));
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid username or password' };
+  const login = async (username, password) => {
+    const res = await loginApi(username, password);
+    const { token, role, name, username: uname } = res.data;
+    const u = { username: uname, role, name };
+    localStorage.setItem('cric_token', token);
+    localStorage.setItem('cric_user', JSON.stringify(u));
+    setUser(u);
+    return { ok: true, role };
   };
 
-  const logout = () => { setUser(null); localStorage.removeItem('cric_user'); };
+  const logout = () => {
+    localStorage.removeItem('cric_token');
+    localStorage.removeItem('cric_user');
+    setUser(null);
+  };
 
   return (
     <AuthContext.Provider value={{

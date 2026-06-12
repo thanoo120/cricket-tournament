@@ -124,29 +124,39 @@ export default function LiveScoring() {
         six: opts.six || false,
         legBye: opts.legBye || false,
       });
-      loadMatchData(id);
-      getBalls(id).then(r => setBalls(r.data || []));
-      showMsg(
+      const msg =
         opts.wicket ? 'Wicket!' :
-        opts.wide ? 'Wide +1' :
+        opts.wide   ? 'Wide +1' :
         opts.noBall ? 'No Ball +1' :
         opts.runs === 4 ? 'FOUR!' :
         opts.runs === 6 ? 'SIX!' :
         opts.runs === 0 ? 'Dot ball' :
-        `+${opts.runs}`
-      );
-      // Rotate strike on odd runs
-      if (!opts.wide && !opts.noBall && opts.runs % 2 === 1) {
+        `+${opts.runs}`;
+
+      // Strike rotation: odd legal runs = batsmen crossed
+      const isLegal   = !opts.wide && !opts.noBall;
+      const oddRuns   = isLegal && (opts.runs % 2 === 1);
+      const endOfOver = isLegal && ballInOver >= 6;
+
+      if (oddRuns) {
+        // Batsmen crossed on the run
         setStrikeBatsman(nonStrikeBatsman);
         setNonStrikeBatsman(strikeBatsman);
       }
-      // End of over: rotate strike and reset bowler
-      if (!opts.wide && !opts.noBall && ballInOver >= 6) {
-        setStrikeBatsman(nonStrikeBatsman);
-        setNonStrikeBatsman(strikeBatsman);
+
+      if (endOfOver) {
+        if (!oddRuns) {
+          // Even runs on last ball — rotate so non-striker faces next over
+          setStrikeBatsman(nonStrikeBatsman);
+          setNonStrikeBatsman(strikeBatsman);
+        }
         setCurrentBowler('');
-        showMsg('Over complete! Select new bowler');
       }
+
+      // Show message and refresh data after state is ready
+      Promise.all([loadMatchData(id), getBalls(id).then(r => setBalls(r.data || []))]).then(() => {
+        showMsg(endOfOver ? 'Over complete! Select new bowler' : msg);
+      });
     } catch (e) {
       showMsg('Failed to record ball');
     }
@@ -198,15 +208,15 @@ export default function LiveScoring() {
     setSaving(false);
   };
 
-  // â”€â”€â”€ Fixture selector screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // --- Fixture selector screen ---
   if (!id) {
     const liveOrScheduled = allMatches.filter(m => m.status === 'LIVE' || m.status === 'SCHEDULED');
     return (
-      <div style={{ padding: '24px', maxWidth: 700, margin: '0 auto' }}>
+      <div style={{ padding: '16px', maxWidth: '700px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         <h2 style={{ marginBottom: 20 }}>Select Match to Score</h2>
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--text-2)' }}>Tournament</label>
-          <select className="form-select" value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} style={{ maxWidth: 360 }}>
+          <select className="form-select" value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} style={{ maxWidth: '100%' }}>
             {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
@@ -225,7 +235,7 @@ export default function LiveScoring() {
                   </div>
                   <button className="btn btn-primary btn-sm">Score This</button>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{m.venue} Â· {m.overs} overs</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{m.venue} · {m.overs} overs</div>
               </div>
             ))}
           </div>
@@ -277,7 +287,7 @@ export default function LiveScoring() {
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexShrink: 0 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/admin/matches/' + id + '/score')}>
-            â† Back
+            † Back
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => {
             setScoreForm({
@@ -316,27 +326,27 @@ export default function LiveScoring() {
               <div className="form-group" style={{ marginBottom: 10 }}>
                 <label className="form-label">Striker (Batsman)</label>
                 <select className="form-select" value={strikeBatsman} onChange={e => setStrikeBatsman(e.target.value)}>
-                  <option value="">â€” Select batsman â€”</option>
+                  <option value="">-- Select batsman --</option>
                   {battingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 10 }}>
                 <label className="form-label">Non-Striker</label>
                 <select className="form-select" value={nonStrikeBatsman} onChange={e => setNonStrikeBatsman(e.target.value)}>
-                  <option value="">â€” Select batsman â€”</option>
+                  <option value="">-- Select batsman --</option>
                   {battingTeamPlayers.filter(p => String(p.id) !== strikeBatsman).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Bowler</label>
                 <select className="form-select" value={currentBowler} onChange={e => setCurrentBowler(e.target.value)}>
-                  <option value="">â€” Select bowler â€”</option>
+                  <option value="">-- Select bowler --</option>
                   {bowlingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               {strikeBatsman && currentBowler && (
                 <div style={{ marginTop: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-                  Over {currentOver}.{ballInOver - 1} â€” Ready to score
+                  Over {currentOver}.{ballInOver - 1} — Ready to score
                 </div>
               )}
             </div>
@@ -345,7 +355,7 @@ export default function LiveScoring() {
           {/* Ball Pad */}
           {isLive && (
             <div className="lc-panel">
-              <div className="lc-panel-header"><span className="lc-panel-label">Record Ball â€” Over {currentOver}, Ball {ballInOver}</span></div>
+              <div className="lc-panel-header"><span className="lc-panel-label">Record Ball — Over {currentOver}, Ball {ballInOver}</span></div>
               <div className="add-event-pad">
                 <div className="event-grid">
                   {[0, 1, 2, 3].map(r => (
@@ -395,7 +405,7 @@ export default function LiveScoring() {
               <div className="over-balls" style={{ flexWrap: 'wrap' }}>
                 {currentOverBalls.map((b, i) => (
                   <div key={b.id} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : b.wide ? 'extra' : b.noBall ? 'extra' : ''}`}>
-                    {b.wide ? 'Wd' : b.noBall ? 'Nb' : b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? 'Â·' : b.runs}
+                    {b.wide ? 'Wd' : b.noBall ? 'Nb' : b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? '·' : b.runs}
                   </div>
                 ))}
                 {!currentOverBalls.length && <span style={{ color: 'var(--text-3)', fontSize: 13 }}>No balls bowled yet this over</span>}
@@ -411,6 +421,7 @@ export default function LiveScoring() {
             <div className="lc-panel-header"><span className="lc-panel-label">Overs Summary</span></div>
             <div style={{ padding: '8px 14px' }}>
               {Array.from({ length: maxOvers }, (_, i) => i + 1).map(ov => {
+                // eslint-disable-next-line no-unused-vars
                 const ovBalls = activeBalls.filter(b => b.overNumber === ov && !b.wide && !b.noBall);
                 const runs = activeBalls.filter(b => b.overNumber === ov).reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0);
                 const wkts = activeBalls.filter(b => b.overNumber === ov && b.wicket).length;
@@ -419,11 +430,11 @@ export default function LiveScoring() {
                     <span style={{ minWidth: 52, color: 'var(--text-2)', fontWeight: 600 }}>Over {ov}</span>
                     <div style={{ display: 'flex', gap: 3 }}>
                       {Array.from({ length: 6 }, (_, j) => {
-                        const b = activeBalls.filter(x => x.overNumber === ov && !x.isWide && !x.isNoBall)[j];
+                        const b = activeBalls.filter(x => x.overNumber === ov && !x.wide && !x.noBall)[j];
                         if (!b) return <div key={j} className="over-ball" style={{ width: 20, height: 20, fontSize: 10, opacity: 0.3 }}>-</div>;
                         return (
                           <div key={j} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : ''}`} style={{ width: 20, height: 20, fontSize: 10 }}>
-                            {b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? 'Â·' : b.runs}
+                            {b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? '·' : b.runs}
                           </div>
                         );
                       })}
@@ -516,13 +527,13 @@ export default function LiveScoring() {
               <div key={b.id} className="timeline-item">
                 <div className={`timeline-dot ${b.four || b.six ? 'notable' : b.wicket ? 'wicket-dot' : ''}`} />
                 <div style={{ flex: 1 }}>
-                  <div className="timeline-over">Over {b.overNumber}.{b.ballNumber} Â· {b.batsmanName || '?'} vs {b.bowlerName || '?'}</div>
+                  <div className="timeline-over">Over {b.overNumber}.{b.ballNumber} · {b.batsmanName || '?'} vs {b.bowlerName || '?'}</div>
                   <div className="timeline-desc">
                     {b.wicket ? 'WICKET!' : b.six ? 'SIX!' : b.four ? 'FOUR!' : b.wide ? 'Wide' : b.noBall ? 'No Ball' : b.legBye ? `Leg Bye ${b.runs}` : b.runs === 0 ? 'Dot ball' : `${b.runs} run${b.runs !== 1 ? 's' : ''}`}
                   </div>
                 </div>
                 <div className={`timeline-runs ${b.wicket ? 'wicket' : ''}`}>
-                  {b.wicket ? 'W' : b.wide ? 'Wd' : b.noBall ? 'Nb' : b.six ? '6' : b.four ? '4' : b.runs === 0 ? 'Â·' : b.runs}
+                  {b.wicket ? 'W' : b.wide ? 'Wd' : b.noBall ? 'Nb' : b.six ? '6' : b.four ? '4' : b.runs === 0 ? '·' : b.runs}
                 </div>
               </div>
             ))}
@@ -534,7 +545,7 @@ export default function LiveScoring() {
       {/* Footer */}
       <div className="live-console-footer">
         <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          Match #{match.matchNumber} Â· {match.overs} overs/team Â· {match.venue}
+          Match #{match.matchNumber} · {match.overs} overs/team · {match.venue}
         </span>
         <button className="footer-action-btn" onClick={() => setShowScoreModal(true)}>Match Settings</button>
         <Link to={`/matches/${id}/scorecard`} className="footer-action-btn" style={{ textDecoration: 'none' }} target="_blank">Full Scorecard</Link>
@@ -546,7 +557,7 @@ export default function LiveScoring() {
           <div className="modal modal-lg">
             <div className="modal-header">
               <div className="modal-title">Match Settings</div>
-              <button className="close-btn" onClick={() => setShowScoreModal(false)}>Ã—</button>
+              <button className="close-btn" onClick={() => setShowScoreModal(false)}>×</button>
             </div>
             <form onSubmit={handleScoreUpdate}>
               <div className="modal-body">
@@ -567,13 +578,13 @@ export default function LiveScoring() {
                     </select>
                   </div>
                 </div>
-                <div className="divider-label">1st Innings â€” {match.team1Name}</div>
+                <div className="divider-label">1st Innings — {match.team1Name}</div>
                 <div className="form-row-3">
                   <div className="form-group"><label className="form-label">Score</label><input className="form-input" type="number" min="0" value={scoreForm.team1Score} onChange={e => setScoreForm(f => ({ ...f, team1Score: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Wickets</label><input className="form-input" type="number" min="0" max="10" value={scoreForm.team1Wickets} onChange={e => setScoreForm(f => ({ ...f, team1Wickets: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Overs</label><input className="form-input" type="number" step="0.1" min="0" value={scoreForm.team1Overs} onChange={e => setScoreForm(f => ({ ...f, team1Overs: e.target.value }))} /></div>
                 </div>
-                <div className="divider-label">2nd Innings â€” {match.team2Name}</div>
+                <div className="divider-label">2nd Innings — {match.team2Name}</div>
                 <div className="form-row-3">
                   <div className="form-group"><label className="form-label">Score</label><input className="form-input" type="number" min="0" value={scoreForm.team2Score} onChange={e => setScoreForm(f => ({ ...f, team2Score: e.target.value }))} /></div>
                   <div className="form-group"><label className="form-label">Wickets</label><input className="form-input" type="number" min="0" max="10" value={scoreForm.team2Wickets} onChange={e => setScoreForm(f => ({ ...f, team2Wickets: e.target.value }))} /></div>
@@ -586,7 +597,7 @@ export default function LiveScoring() {
                       <div className="form-group">
                         <label className="form-label">Winner</label>
                         <select className="form-select" value={scoreForm.winnerId} onChange={e => setScoreForm(f => ({ ...f, winnerId: e.target.value }))}>
-                          <option value="">â€” No result / Tie â€”</option>
+                          <option value="">— No result / Tie —</option>
                           <option value={match.team1Id}>{match.team1Name}</option>
                           <option value={match.team2Id}>{match.team2Name}</option>
                         </select>
@@ -594,7 +605,7 @@ export default function LiveScoring() {
                       <div className="form-group">
                         <label className="form-label">Player of the Match</label>
                         <select className="form-select" value={scoreForm.playerOfMatchId} onChange={e => setScoreForm(f => ({ ...f, playerOfMatchId: e.target.value }))}>
-                          <option value="">â€” Select player â€”</option>
+                          <option value="">— Select player —</option>
                           {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                       </div>
@@ -619,14 +630,14 @@ export default function LiveScoring() {
       {showBatModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowBatModal(false)}>
           <div className="modal modal-md">
-            <div className="modal-header"><div className="modal-title">Batting Performance</div><button className="close-btn" onClick={() => setShowBatModal(false)}>Ã—</button></div>
+            <div className="modal-header"><div className="modal-title">Batting Performance</div><button className="close-btn" onClick={() => setShowBatModal(false)}>×</button></div>
             <form onSubmit={handleBatSubmit}>
               <div className="modal-body">
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Batter</label>
                     <select className="form-select" required value={batForm.playerId} onChange={e => setBatForm(f => ({ ...f, playerId: e.target.value }))}>
-                      <option value="">â€” Select â€”</option>
+                      <option value="">— Select —</option>
                       {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
@@ -672,14 +683,14 @@ export default function LiveScoring() {
       {showBowlModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowBowlModal(false)}>
           <div className="modal modal-md">
-            <div className="modal-header"><div className="modal-title">Bowling Performance</div><button className="close-btn" onClick={() => setShowBowlModal(false)}>Ã—</button></div>
+            <div className="modal-header"><div className="modal-title">Bowling Performance</div><button className="close-btn" onClick={() => setShowBowlModal(false)}>×</button></div>
             <form onSubmit={handleBowlSubmit}>
               <div className="modal-body">
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Bowler</label>
                     <select className="form-select" required value={bowlForm.playerId} onChange={e => setBowlForm(f => ({ ...f, playerId: e.target.value }))}>
-                      <option value="">â€” Select â€”</option>
+                      <option value="">— Select —</option>
                       {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>

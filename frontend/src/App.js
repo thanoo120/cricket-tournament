@@ -24,6 +24,7 @@ import LiveScoring from './pages/LiveScoring';
 import LiveMatchView from './pages/LiveMatchView';
 
 import './App.css';
+import './public-styles.css';
 
 function PublicLayout({ children }) {
   return <Layout isAdmin={false}>{children}</Layout>;
@@ -38,7 +39,7 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Default redirect */}
+          {/* Default: public results page */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Auth */}
@@ -59,16 +60,16 @@ export default function App() {
             <ProtectedRoute><AdminLayout><AdminDashboard /></AdminLayout></ProtectedRoute>
           } />
           <Route path="/admin/tournaments" element={
-            <ProtectedRoute requireAdmin><AdminLayout><Tournaments /></AdminLayout></ProtectedRoute>
+            <ProtectedRoute><AdminLayout><Tournaments /></AdminLayout></ProtectedRoute>
           } />
           <Route path="/admin/tournaments/:id" element={
             <ProtectedRoute><AdminLayout><TournamentDetail admin /></AdminLayout></ProtectedRoute>
           } />
           <Route path="/admin/tournaments/:id/teams" element={
-            <ProtectedRoute requireAdmin><AdminLayout><Teams /></AdminLayout></ProtectedRoute>
+            <ProtectedRoute><AdminLayout><Teams /></AdminLayout></ProtectedRoute>
           } />
           <Route path="/admin/tournaments/:id/players" element={
-            <ProtectedRoute requireAdmin><AdminLayout><Players /></AdminLayout></ProtectedRoute>
+            <ProtectedRoute><AdminLayout><Players /></AdminLayout></ProtectedRoute>
           } />
           <Route path="/admin/tournaments/:id/matches" element={
             <ProtectedRoute><AdminLayout><AdminMatches /></AdminLayout></ProtectedRoute>

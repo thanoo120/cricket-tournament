@@ -63,6 +63,9 @@ public class MatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Match not found: " + matchId));
 
+        // Capture original status before any mutation so updatePointsTable can guard against double-counting
+        Match.MatchStatus originalStatus = match.getStatus();
+
         if (request.getTeam() != null) {
             if ("team1".equals(request.getTeam())) {
                 match.setTeam1Score(request.getScore());
@@ -93,7 +96,7 @@ public class MatchService {
             Team winner = teamRepository.findById(request.getWinnerId())
                     .orElseThrow(() -> new RuntimeException("Winner team not found"));
             match.setWinner(winner);
-            updatePointsTable(match, winner);
+            updatePointsTable(match, winner, originalStatus);
             updateNetRunRates(match);
         }
         if (request.getPlayerOfMatchId() != null) {
@@ -216,12 +219,12 @@ public class MatchService {
         return Math.round((wholePart + balls / 10.0) * 10.0) / 10.0;
     }
 
-    private void updatePointsTable(Match match, Team winner) {
+    private void updatePointsTable(Match match, Team winner, Match.MatchStatus originalStatus) {
         Team t1 = match.getTeam1();
         Team t2 = match.getTeam2();
 
-        // Only increment matchesPlayed if this match wasn't already completed
-        if (match.getStatus() != Match.MatchStatus.COMPLETED) {
+        // Only increment matchesPlayed if the match wasn't already completed before this update
+        if (originalStatus != Match.MatchStatus.COMPLETED) {
             t1.setMatchesPlayed(t1.getMatchesPlayed() + 1);
             t2.setMatchesPlayed(t2.getMatchesPlayed() + 1);
         }
@@ -254,15 +257,15 @@ public class MatchService {
 
             for (Match m : completed) {
                 if (m.getTeam1() != null && m.getTeam1().getId().equals(team.getId())) {
-                    runsScored += m.getTeam1Score();
+                    runsScored  += (m.getTeam1Score() != null ? m.getTeam1Score() : 0);
                     oversPlayed += m.getTeam1Overs();
-                    runsConceded += m.getTeam2Score();
-                    oversFaced += m.getTeam2Overs();
+                    runsConceded += (m.getTeam2Score() != null ? m.getTeam2Score() : 0);
+                    oversFaced  += m.getTeam2Overs();
                 } else if (m.getTeam2() != null && m.getTeam2().getId().equals(team.getId())) {
-                    runsScored += m.getTeam2Score();
+                    runsScored  += (m.getTeam2Score() != null ? m.getTeam2Score() : 0);
                     oversPlayed += m.getTeam2Overs();
-                    runsConceded += m.getTeam1Score();
-                    oversFaced += m.getTeam1Overs();
+                    runsConceded += (m.getTeam1Score() != null ? m.getTeam1Score() : 0);
+                    oversFaced  += m.getTeam1Overs();
                 }
             }
 
