@@ -40,7 +40,7 @@ export default function Players({ readOnly }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
-    await createPlayer({ ...form, teamId: parseInt(form.teamId) });
+    await createPlayer({ ...form, teamId: parseInt(form.teamId, 10) });
     setShowModal(false);
     if (selectedTeam) getPlayers(selectedTeam).then(r => setPlayers(r.data));
     setSaving(false);

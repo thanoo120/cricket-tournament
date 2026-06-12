@@ -20,7 +20,7 @@ export default function Leaderboard() {
       getTopBowlers(id),
     ]).then(([t, te, b, bw]) => {
       setTournament(t.data);
-      setTeams([...te.data].sort((a, b) => b.points - a.points || b.netRunRate - a.netRunRate));
+      setTeams([...te.data].sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || (b.netRunRate ?? 0) - (a.netRunRate ?? 0)));
       setBatsmen(b.data);
       setBowlers(bw.data);
       setLoading(false);

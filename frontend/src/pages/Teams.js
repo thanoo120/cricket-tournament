@@ -100,7 +100,7 @@ export default function Teams({ readOnly }) {
                   </div>
 
                   {/* Stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+                  <div className="team-stats-grid" style={{ marginBottom: 14 }}>
                     {[['M', t.matchesPlayed], ['W', t.matchesWon], ['L', t.matchesLost], ['Pts', t.points]].map(([label, val]) => (
                       <div key={label} style={{ textAlign: 'center', background: 'var(--navy-3)', borderRadius: 'var(--r-sm)', padding: '8px 4px' }}>
                         <div style={{ fontFamily: 'Rajdhani', fontSize: 18, fontWeight: 700, color: label === 'W' ? 'var(--green)' : label === 'L' ? 'var(--red)' : label === 'Pts' ? 'var(--gold-light)' : 'var(--text-1)' }}>{val || 0}</div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getMatch, getScorecard, getBalls, subscribeToMatch } from '../services/api';
 
@@ -59,13 +59,13 @@ export default function LiveMatchView() {
           return (
             <div key={ov} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>
-                Over {ov} â€” {runs} run{runs !== 1 ? 's' : ''}{wkts > 0 ? `, ${wkts} wkt${wkts > 1 ? 's' : ''}` : ''}
+                Over {ov} - {runs} run{runs !== 1 ? 's' : ''}{wkts > 0 ? `, ${wkts} wkt${wkts > 1 ? 's' : ''}` : ''}
               </div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {ovBalls.map((b, i) => (
                   <div key={b.id} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : b.wide || b.noBall ? 'extra' : ''}`}
                     title={`${b.batsmanName || '?'} vs ${b.bowlerName || '?'}`}>
-                    {b.wide ? 'Wd' : b.noBall ? 'Nb' : b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? 'Â·' : b.runs}
+                    {b.wide ? 'Wd' : b.noBall ? 'Nb' : b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? '·' : b.runs}
                   </div>
                 ))}
               </div>
@@ -82,10 +82,10 @@ export default function LiveMatchView() {
       <div className="live-score-header" style={{ padding: '20px 24px' }}>
         <div style={{ flex: 1 }}>
           <div className="live-badge-row">
-            {isLive && <span className="badge badge-live" style={{ animation: 'pulse 1.5s infinite' }}>â— LIVE</span>}
+            {isLive && <span className="badge badge-live" style={{ animation: 'pulse 1.5s infinite' }}>— LIVE</span>}
             {match.status === 'COMPLETED' && <span className="badge badge-completed">FINAL</span>}
             {match.status === 'SCHEDULED' && <span className="badge" style={{ background: 'var(--card-bg)' }}>UPCOMING</span>}
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{match.venue} Â· {match.overs} overs</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{match.venue} · {match.overs} overs</span>
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>
             {match.team1Name} vs {match.team2Name}
@@ -102,7 +102,7 @@ export default function LiveMatchView() {
 
       <div style={{ padding: '0 24px' }}>
         {/* Scores */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
+        <div className="lmv-score-grid" style={{ marginTop: 20 }}>
           {[
             { name: match.team1Name, color: match.team1Color, score: match.team1Score, wkts: match.team1Wickets, overs: match.team1Overs, label: '1st Innings' },
             { name: match.team2Name, color: match.team2Color, score: match.team2Score, wkts: match.team2Wickets, overs: match.team2Overs, label: '2nd Innings' },
@@ -131,10 +131,10 @@ export default function LiveMatchView() {
         {/* Ball by Ball */}
         <div style={{ marginTop: 28 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Ball-by-Ball Commentary</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div className="lmv-score-grid" style={{ gap: 20 }}>
             {[
-              { label: `1st Innings â€” ${match.team1Name}`, type: 'FIRST' },
-              { label: `2nd Innings â€” ${match.team2Name}`, type: 'SECOND' },
+              { label: `1st Innings - ${match.team1Name}`, type: 'FIRST' },
+              { label: `2nd Innings - ${match.team2Name}`, type: 'SECOND' },
             ].map(({ label, type }) => (
               <div key={type} className="card" style={{ padding: 16 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>{label}</div>
@@ -153,7 +153,7 @@ export default function LiveMatchView() {
         {(innings1 || innings2) && (
           <div style={{ marginTop: 28 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Batting</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div className="lmv-score-grid" style={{ gap: 20 }}>
               {[
                 { label: match.team1Name, innings: innings1 },
                 { label: match.team2Name, innings: innings2 },
@@ -190,7 +190,7 @@ export default function LiveMatchView() {
         {(innings1?.bowling?.length > 0 || innings2?.bowling?.length > 0) && (
           <div style={{ marginTop: 28 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Bowling</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div className="lmv-score-grid" style={{ gap: 20 }}>
               {[
                 { label: match.team2Name + ' bowling', innings: innings1 },
                 { label: match.team1Name + ' bowling', innings: innings2 },

@@ -137,9 +137,11 @@ export default function Tournaments() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <Link to={`/admin/tournaments/${t.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
-                      Manage
-                    </Link>
+                    {isAdmin && (
+                      <Link to={`/admin/tournaments/${t.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                        Manage
+                      </Link>
+                    )}
                     <Link to={`/admin/tournaments/${t.id}/matches`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
                       Matches
                     </Link>

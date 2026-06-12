@@ -92,7 +92,7 @@ export default function AdminDashboard() {
           <div className="alert alert-danger" style={{ marginBottom: 20 }}>
             <span>📡</span>
             <strong>{liveMatches.length} match{liveMatches.length > 1 ? 'es' : ''} in progress</strong>
-            <span style={{ marginLeft: 8, fontSize: 12 }}>— Go to Matches to update live scores</span>
+            <span style={{ marginLeft: 8, fontSize: 12 }}>— Open the tournament to update live scores</span>
             {tournaments.find(t => t.status === 'ONGOING') && (
               <Link to={`/admin/tournaments/${tournaments.find(t => t.status === 'ONGOING').id}/matches`}
                 className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }}>
@@ -101,15 +101,6 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
-
-        {/* Credential info for admin */}
-        <div className="alert alert-warning" style={{ marginBottom: 24 }}>
-          <span>🔑</span>
-          <div>
-            <strong>Demo Credentials</strong>
-            <div style={{ fontSize: 12, marginTop: 3 }}>Admin: admin / cricket@2025 &nbsp;|&nbsp; Scorer: scorer / scorer@2025</div>
-          </div>
-        </div>
 
         {/* Tournaments table */}
         <div className="section-title">🏆 All Tournaments</div>
@@ -172,9 +163,9 @@ export default function AdminDashboard() {
           <div className="section-title">⚡ Quick Actions</div>
           <div className="grid-3">
             {[
-              { icon: '🏆', title: 'New Tournament', desc: 'Create a tournament and set up fixtures', to: '/admin/tournaments', color: 'var(--gold-glow)' },
-              { icon: '🛡', title: 'Manage Teams', desc: 'Add teams, assign colors and players', to: tournaments[0] ? `/admin/tournaments/${tournaments[0]?.id}/teams` : '/admin/tournaments', color: 'var(--blue-muted)' },
-              { icon: '🎯', title: 'Score Matches', desc: 'Enter ball-by-ball live scores', to: tournaments.find(t => t.status === 'ONGOING') ? `/admin/tournaments/${tournaments.find(t => t.status === 'ONGOING').id}/matches` : '/admin/tournaments', color: 'var(--red-muted)' },
+              { icon: '🏆', title: 'Tournaments', desc: 'Create and manage cricket tournaments', to: '/admin/tournaments', color: 'var(--gold-glow)' },
+              { icon: '🛡', title: 'Manage Teams', desc: 'Add teams and assign players', to: tournaments[0] ? `/admin/tournaments/${tournaments[0]?.id}/teams` : '/admin/tournaments', color: 'var(--blue-muted)' },
+              { icon: '⚾', title: 'Live Scorer', desc: 'Enter ball-by-ball live scores', to: '/admin/scorer', color: 'var(--red-muted)' },
             ].map(a => (
               <Link to={a.to} key={a.title} className="card" style={{ display: 'block', padding: 20, textDecoration: 'none', transition: 'all 0.2s' }}
                 onMouseOver={e => e.currentTarget.style.borderColor = 'rgba(212,160,23,0.3)'}
