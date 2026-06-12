@@ -1,13 +1,9 @@
 services:
   - type: web
     name: cricket-tournament-backend
-    runtime: java
-    rootDir: backend
-    buildCommand: mvn clean package -DskipTests
-    startCommand: java -jar target/app.jar
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
     envVars:
-      - key: JAVA_VERSION
-        value: "17"
       - key: PORT
         value: "8080"
       - key: DB_URL
