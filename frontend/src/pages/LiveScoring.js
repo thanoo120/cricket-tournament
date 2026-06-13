@@ -124,15 +124,21 @@ export default function LiveScoring() {
       setMatch(m);
       setScorecard(sr.data);
       setBalls(br.data || []);
-      // Keep scoreForm toss fields in sync with latest match data
+      // Sync all scoreForm fields from latest match data
       setScoreForm(f => ({
         ...f,
-        tossWinnerId: m.tossWinnerId ? String(m.tossWinnerId) : f.tossWinnerId,
-        tossDecision: m.tossDecision || f.tossDecision,
-        result: m.result || f.result,
+        team1Score: m.team1Score ?? '',
+        team1Wickets: m.team1Wickets ?? '',
+        team1Overs: m.team1Overs ?? '',
+        team2Score: m.team2Score ?? '',
+        team2Wickets: m.team2Wickets ?? '',
+        team2Overs: m.team2Overs ?? '',
         status: m.status || f.status,
-        winnerId: m.winnerId ? String(m.winnerId) : f.winnerId,
-        playerOfMatchId: m.playerOfMatchId ? String(m.playerOfMatchId) : f.playerOfMatchId,
+        tossWinnerId: m.tossWinnerId ? String(m.tossWinnerId) : '',
+        tossDecision: m.tossDecision || 'BAT',
+        winnerId: m.winnerId ? String(m.winnerId) : '',
+        result: m.result || '',
+        playerOfMatchId: m.playerOfMatchId ? String(m.playerOfMatchId) : '',
       }));
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -252,24 +258,30 @@ export default function LiveScoring() {
     e.preventDefault();
     setSaving(true);
     try {
-      if (scoreForm.team1Score !== '') {
-        await updateScore(id, {
-          team: 'team1', score: +scoreForm.team1Score,
-          wickets: +scoreForm.team1Wickets || 0, overs: +scoreForm.team1Overs || 0,
-          status: scoreForm.status, tossWinnerId: scoreForm.tossWinnerId || undefined,
-          tossDecision: scoreForm.tossDecision, result: scoreForm.result || undefined,
-          winnerId: scoreForm.winnerId ? +scoreForm.winnerId : undefined,
-          playerOfMatchId: scoreForm.playerOfMatchId ? +scoreForm.playerOfMatchId : undefined,
-        });
-      }
-      if (scoreForm.team2Score !== '') {
-        await updateScore(id, {
-          team: 'team2', score: +scoreForm.team2Score,
-          wickets: +scoreForm.team2Wickets || 0, overs: +scoreForm.team2Overs || 0,
-        });
-      }
-      loadMatchData(id); setShowScoreModal(false); showMsg('Score updated');
-    } catch { showMsg('Failed to update score'); }
+      // Always send metadata (status, toss, winner, result) + team1 score
+      await updateScore(id, {
+        team: 'team1',
+        score: scoreForm.team1Score !== '' ? +scoreForm.team1Score : (match.team1Score ?? 0),
+        wickets: scoreForm.team1Wickets !== '' ? +scoreForm.team1Wickets : (match.team1Wickets ?? 0),
+        overs: scoreForm.team1Overs !== '' ? +scoreForm.team1Overs : (match.team1Overs ?? 0),
+        status: scoreForm.status,
+        tossWinnerId: scoreForm.tossWinnerId ? +scoreForm.tossWinnerId : undefined,
+        tossDecision: scoreForm.tossDecision || undefined,
+        result: scoreForm.result || undefined,
+        winnerId: scoreForm.winnerId ? +scoreForm.winnerId : undefined,
+        playerOfMatchId: scoreForm.playerOfMatchId ? +scoreForm.playerOfMatchId : undefined,
+      });
+      // Team2 score is separate since the API splits by team
+      await updateScore(id, {
+        team: 'team2',
+        score: scoreForm.team2Score !== '' ? +scoreForm.team2Score : (match.team2Score ?? 0),
+        wickets: scoreForm.team2Wickets !== '' ? +scoreForm.team2Wickets : (match.team2Wickets ?? 0),
+        overs: scoreForm.team2Overs !== '' ? +scoreForm.team2Overs : (match.team2Overs ?? 0),
+      });
+      await loadMatchData(id);
+      setShowScoreModal(false);
+      showMsg('Settings saved');
+    } catch { showMsg('Failed to update settings'); }
     setSaving(false);
   };
 
@@ -334,13 +346,46 @@ export default function LiveScoring() {
 
   const isLive = match.status === 'LIVE';
   const allPlayers = [...team1Players, ...team2Players];
-  const battingTeamPlayers = activeInnings === 'FIRST' ? team1Players : team2Players;
-  const bowlingTeamPlayers = activeInnings === 'FIRST' ? team2Players : team1Players;
-  const innings1 = scorecard?.firstInnings;
-  const innings2 = scorecard?.secondInnings;
-  const activeScore = activeInnings === 'FIRST' ? (match.team1Score ?? 0) : (match.team2Score ?? 0);
-  const activeWickets = activeInnings === 'FIRST' ? match.team1Wickets : match.team2Wickets;
-  const activeOvers = activeInnings === 'FIRST' ? match.team1Overs : match.team2Overs;
+
+  // Determine batting order from toss. Default: team1 bats first.
+  const team1BatsFirst = !match.tossWinnerId ||
+    (String(match.tossWinnerId) === String(match.team1Id) && match.tossDecision === 'BAT') ||
+    (String(match.tossWinnerId) === String(match.team2Id) && match.tossDecision === 'BOWL');
+
+  // Which team bats in the currently selected innings
+  const battingIsTeam1 = activeInnings === 'FIRST' ? team1BatsFirst : !team1BatsFirst;
+  const battingTeamPlayers = battingIsTeam1 ? team1Players : team2Players;
+  const bowlingTeamPlayers = battingIsTeam1 ? team2Players : team1Players;
+  const battingTeamName   = battingIsTeam1 ? match.team1Name : match.team2Name;
+
+  // Backend always stores team1Score for team1, team2Score for team2 — map by team identity
+  const activeScore   = battingIsTeam1 ? (match.team1Score ?? 0) : (match.team2Score ?? 0);
+  const activeWickets = battingIsTeam1 ? match.team1Wickets : match.team2Wickets;
+  const activeOvers   = battingIsTeam1 ? match.team1Overs   : match.team2Overs;
+
+  // First-innings batting team score = target for second innings
+  const firstBattingIsTeam1 = team1BatsFirst;
+  const firstInningsScore = firstBattingIsTeam1 ? match.team1Score : match.team2Score;
+
+  // Scorecard innings: backend groups by inningsType which matches the play order,
+  // but labels team/total as team1 always — override with correct batting team values.
+  const rawInnings1 = scorecard?.firstInnings;
+  const rawInnings2 = scorecard?.secondInnings;
+  const innings1 = rawInnings1 ? {
+    ...rawInnings1,
+    team: firstBattingIsTeam1 ? match.team1Name : match.team2Name,
+    total: firstBattingIsTeam1 ? match.team1Score : match.team2Score,
+    wickets: firstBattingIsTeam1 ? match.team1Wickets : match.team2Wickets,
+    overs: firstBattingIsTeam1 ? match.team1Overs : match.team2Overs,
+  } : null;
+  const innings2 = rawInnings2 ? {
+    ...rawInnings2,
+    team: firstBattingIsTeam1 ? match.team2Name : match.team1Name,
+    total: firstBattingIsTeam1 ? match.team2Score : match.team1Score,
+    wickets: firstBattingIsTeam1 ? match.team2Wickets : match.team1Wickets,
+    overs: firstBattingIsTeam1 ? match.team2Overs : match.team1Overs,
+  } : null;
+
   const activeBalls = balls.filter(b => b.inningsType === activeInnings);
   const currentOverBalls = activeBalls.filter(b => b.overNumber === currentOver);
   const maxOvers = match.overs || 3;
@@ -349,7 +394,7 @@ export default function LiveScoring() {
   const oversComplete = Math.floor(activeOversVal) >= maxOvers;
   const allOut = (activeWickets ?? 0) >= 10;
   const inningsComplete = isLive && (oversComplete || allOut);
-  const target = match.team1Score != null ? match.team1Score + 1 : null;
+  const target = firstInningsScore != null ? firstInningsScore + 1 : null;
   const chaseWon = activeInnings === 'SECOND' && target != null && activeScore >= target;
 
   const legalBallsPlayed = Math.floor(activeOversVal) * 6 + Math.round((activeOversVal % 1) * 10);
@@ -552,11 +597,7 @@ export default function LiveScoring() {
           <PBtn label="End Innings" onClick={() => { setMode(null); setActiveInnings(activeInnings === 'FIRST' ? 'SECOND' : 'FIRST'); }} />
           <PBtn label="+ Bat" onClick={() => { setMode(null); setBatForm(f => ({ ...f, inningsType: activeInnings })); setShowBatModal(true); }} />
           <PBtn label="+ Bowl" onClick={() => { setMode(null); setBowlForm(f => ({ ...f, inningsType: activeInnings })); setShowBowlModal(true); }} />
-          <PBtn label="Settings" onClick={() => {
-            setMode(null);
-            setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: match.tossWinnerId ? String(match.tossWinnerId) : '', tossDecision: match.tossDecision || 'BAT', winnerId: match.winnerId ? String(match.winnerId) : '', result: match.result || '', playerOfMatchId: match.playerOfMatchId ? String(match.playerOfMatchId) : '' });
-            setShowScoreModal(true);
-          }} />
+          <PBtn label="Settings" onClick={() => { setMode(null); setShowScoreModal(true); }} />
         </div>
       </div>
     );
@@ -618,13 +659,13 @@ export default function LiveScoring() {
             {match.team1Name} vs {match.team2Name} · Match #{match.matchNumber}
           </div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>
-            {activeInnings === 'FIRST' ? match.team1Name : match.team2Name} — {activeInnings === 'FIRST' ? '1st' : '2nd'} Innings
+            {battingTeamName} — {activeInnings === 'FIRST' ? '1st' : '2nd'} Innings
           </div>
         </div>
         {isLive && <span style={{ fontSize: 10, fontWeight: 700, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>LIVE</span>}
         {match.status === 'COMPLETED' && <span style={{ fontSize: 10, fontWeight: 700, background: '#64748b', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>FINAL</span>}
         <button
-          onClick={() => { setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: match.tossWinnerId ? String(match.tossWinnerId) : '', tossDecision: match.tossDecision || 'BAT', winnerId: match.winnerId ? String(match.winnerId) : '', result: match.result || '', playerOfMatchId: match.playerOfMatchId ? String(match.playerOfMatchId) : '' }); setShowScoreModal(true); }}
+          onClick={() => setShowScoreModal(true)}
           style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
           ⚙
         </button>
@@ -839,7 +880,7 @@ export default function LiveScoring() {
       {(inningsComplete || chaseWon) && (
         <div style={{ background: chaseWon ? '#16a34a' : '#f97316', color: '#fff', padding: '12px 14px', textAlign: 'center', fontWeight: 700, flexShrink: 0 }}>
           {chaseWon
-            ? `🏆 ${match.team2Name} wins the match!`
+            ? `🏆 ${team1BatsFirst ? match.team2Name : match.team1Name} wins the match!`
             : allOut
               ? `All out! Innings complete.`
               : `Over limit reached — innings complete.`}
@@ -858,9 +899,13 @@ export default function LiveScoring() {
         {/* Innings toggle + scorecard link */}
         <div style={{ display: 'flex', padding: '10px 12px', gap: 8, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
           <button className={`btn btn-sm ${activeInnings === 'FIRST' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveInnings('FIRST')}>{match.team1Name} (1st)</button>
+            onClick={() => setActiveInnings('FIRST')}>
+            {team1BatsFirst ? match.team1Name : match.team2Name} (1st)
+          </button>
           <button className={`btn btn-sm ${activeInnings === 'SECOND' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveInnings('SECOND')}>{match.team2Name} (2nd)</button>
+            onClick={() => setActiveInnings('SECOND')}>
+            {team1BatsFirst ? match.team2Name : match.team1Name} (2nd)
+          </button>
           <Link to={`/matches/${id}/scorecard`} target="_blank"
             style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
             Full Scorecard ↗
@@ -869,8 +914,8 @@ export default function LiveScoring() {
 
         {/* Scorecard tables */}
         {[
-          { label: `1st — ${match.team1Name}`, score: match.team1Score, wkts: match.team1Wickets, overs: match.team1Overs, innings: innings1 },
-          { label: `2nd — ${match.team2Name}`, score: match.team2Score, wkts: match.team2Wickets, overs: match.team2Overs, innings: innings2 },
+          { label: `1st — ${innings1?.team ?? (team1BatsFirst ? match.team1Name : match.team2Name)}`, score: innings1?.total, wkts: innings1?.wickets, overs: innings1?.overs, innings: innings1 },
+          { label: `2nd — ${innings2?.team ?? (team1BatsFirst ? match.team2Name : match.team1Name)}`, score: innings2?.total, wkts: innings2?.wickets, overs: innings2?.overs, innings: innings2 },
         ].map(({ label, score, wkts, overs, innings }) => (
           <div key={label} style={{ background: '#fff', marginTop: 8, borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
             <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -948,7 +993,7 @@ export default function LiveScoring() {
         {/* Overs summary */}
         <div style={{ background: '#fff', marginTop: 8, borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-            Over by Over — {activeInnings === 'FIRST' ? match.team1Name : match.team2Name}
+            Over by Over — {battingTeamName}
           </div>
           {Array.from({ length: Math.max(currentOver, 1) }, (_, i) => i + 1).map(ov => {
             const ovBalls = activeBalls.filter(b => b.overNumber === ov);
