@@ -88,6 +88,7 @@ export default function LiveScoring() {
   const [activeInnings, setActiveInnings] = useState('FIRST');
   const [saving, setSaving] = useState(false);
   const [undoing, setUndoing] = useState(false);
+  const [showTossEdit, setShowTossEdit] = useState(false);
   const [showBatModal, setShowBatModal] = useState(false);
   const [showBowlModal, setShowBowlModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -119,9 +120,20 @@ export default function LiveScoring() {
 
   const loadMatchData = useCallback((matchId) => {
     Promise.all([getMatch(matchId), getScorecard(matchId), getBalls(matchId)]).then(([mr, sr, br]) => {
-      setMatch(mr.data);
+      const m = mr.data;
+      setMatch(m);
       setScorecard(sr.data);
       setBalls(br.data || []);
+      // Keep scoreForm toss fields in sync with latest match data
+      setScoreForm(f => ({
+        ...f,
+        tossWinnerId: m.tossWinnerId ? String(m.tossWinnerId) : f.tossWinnerId,
+        tossDecision: m.tossDecision || f.tossDecision,
+        result: m.result || f.result,
+        status: m.status || f.status,
+        winnerId: m.winnerId ? String(m.winnerId) : f.winnerId,
+        playerOfMatchId: m.playerOfMatchId ? String(m.playerOfMatchId) : f.playerOfMatchId,
+      }));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -542,7 +554,7 @@ export default function LiveScoring() {
           <PBtn label="+ Bowl" onClick={() => { setMode(null); setBowlForm(f => ({ ...f, inningsType: activeInnings })); setShowBowlModal(true); }} />
           <PBtn label="Settings" onClick={() => {
             setMode(null);
-            setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: '', tossDecision: match.tossDecision || 'BAT', winnerId: '', result: match.result || '', playerOfMatchId: '' });
+            setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: match.tossWinnerId ? String(match.tossWinnerId) : '', tossDecision: match.tossDecision || 'BAT', winnerId: match.winnerId ? String(match.winnerId) : '', result: match.result || '', playerOfMatchId: match.playerOfMatchId ? String(match.playerOfMatchId) : '' });
             setShowScoreModal(true);
           }} />
         </div>
@@ -612,7 +624,7 @@ export default function LiveScoring() {
         {isLive && <span style={{ fontSize: 10, fontWeight: 700, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>LIVE</span>}
         {match.status === 'COMPLETED' && <span style={{ fontSize: 10, fontWeight: 700, background: '#64748b', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>FINAL</span>}
         <button
-          onClick={() => { setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: '', tossDecision: match.tossDecision || 'BAT', winnerId: '', result: match.result || '', playerOfMatchId: '' }); setShowScoreModal(true); }}
+          onClick={() => { setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: match.tossWinnerId ? String(match.tossWinnerId) : '', tossDecision: match.tossDecision || 'BAT', winnerId: match.winnerId ? String(match.winnerId) : '', result: match.result || '', playerOfMatchId: match.playerOfMatchId ? String(match.playerOfMatchId) : '' }); setShowScoreModal(true); }}
           style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
           ⚙
         </button>
@@ -659,6 +671,86 @@ export default function LiveScoring() {
           {currentOverBalls.filter(b => !b.wide && !b.noBall).length}/6
         </span>
       </div>
+
+      {/* TOSS INFO BAR — shown once toss is confirmed */}
+      {isLive && match.tossWinnerId && (
+        <div style={{ background: '#0f172a', borderTop: '1px solid rgba(255,255,255,0.08)', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 13 }}>🪙</span>
+          <span style={{ fontSize: 12, color: '#94a3b8', flex: 1 }}>
+            <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{match.tossWinnerName}</span>
+            {' '}won the toss and elected to{' '}
+            <span style={{ color: '#f97316', fontWeight: 600 }}>
+              {match.tossDecision === 'BAT' ? 'bat' : 'bowl'}
+            </span>
+          </span>
+          <button
+            onClick={() => setShowTossEdit(true)}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#cbd5e1', borderRadius: 6, padding: '3px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+            Edit
+          </button>
+        </div>
+      )}
+
+      {/* TOSS SETUP — shown when toss hasn't been set yet */}
+      {isLive && !match.tossWinnerId && (
+        <div style={{ background: '#1e40af', color: '#fff', padding: '14px 14px', flexShrink: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>🪙 Set Toss Result</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>Who won the toss?</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            {[{ id: match.team1Id, name: match.team1Name }, { id: match.team2Id, name: match.team2Name }].map(t => (
+              <button key={t.id}
+                onClick={() => setScoreForm(f => ({ ...f, tossWinnerId: String(t.id) }))}
+                style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 8, border: '2px solid',
+                  borderColor: scoreForm.tossWinnerId === String(t.id) ? '#fff' : 'rgba(255,255,255,0.3)',
+                  background: scoreForm.tossWinnerId === String(t.id) ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                }}>
+                {t.name}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>Elected to…</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {['BAT', 'BOWL'].map(d => (
+              <button key={d}
+                onClick={() => setScoreForm(f => ({ ...f, tossDecision: d }))}
+                style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 8, border: '2px solid',
+                  borderColor: scoreForm.tossDecision === d ? '#fff' : 'rgba(255,255,255,0.3)',
+                  background: scoreForm.tossDecision === d ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                }}>
+                {d === 'BAT' ? '🏏 Bat' : '⚾ Bowl'}
+              </button>
+            ))}
+          </div>
+          <button
+            disabled={!scoreForm.tossWinnerId || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await updateScore(id, {
+                  team: 'team1', score: match.team1Score ?? 0,
+                  wickets: match.team1Wickets ?? 0, overs: match.team1Overs ?? 0,
+                  status: 'LIVE',
+                  tossWinnerId: +scoreForm.tossWinnerId,
+                  tossDecision: scoreForm.tossDecision,
+                });
+                loadMatchData(id);
+              } catch { showMsg('Failed to save toss'); }
+              setSaving(false);
+            }}
+            style={{
+              width: '100%', padding: '10px', borderRadius: 8, border: 'none',
+              background: scoreForm.tossWinnerId ? '#fff' : 'rgba(255,255,255,0.3)',
+              color: scoreForm.tossWinnerId ? '#1e40af' : 'rgba(255,255,255,0.5)',
+              fontWeight: 700, fontSize: 14, cursor: scoreForm.tossWinnerId ? 'pointer' : 'not-allowed',
+            }}>
+            {saving ? 'Saving…' : 'Confirm Toss →'}
+          </button>
+        </div>
+      )}
 
       {/* LIVE PLAYERS */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 12px', flexShrink: 0 }}>
@@ -891,6 +983,70 @@ export default function LiveScoring() {
 
       {/* ---- MODALS ---- */}
 
+      {/* TOSS EDIT MODAL */}
+      {showTossEdit && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowTossEdit(false)}>
+          <div className="modal modal-sm">
+            <div className="modal-header">
+              <div className="modal-title">🪙 Edit Toss</div>
+              <button className="close-btn" onClick={() => setShowTossEdit(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Toss Won By</label>
+                <select className="form-select" value={scoreForm.tossWinnerId}
+                  onChange={e => setScoreForm(f => ({ ...f, tossWinnerId: e.target.value }))}>
+                  <option value="">— Select team —</option>
+                  <option value={String(match.team1Id)}>{match.team1Name}</option>
+                  <option value={String(match.team2Id)}>{match.team2Name}</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Elected To</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {['BAT', 'BOWL'].map(d => (
+                    <button key={d} type="button"
+                      onClick={() => setScoreForm(f => ({ ...f, tossDecision: d }))}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: 8,
+                        border: '2px solid',
+                        borderColor: scoreForm.tossDecision === d ? 'var(--accent)' : 'var(--border)',
+                        background: scoreForm.tossDecision === d ? 'var(--accent-muted, #fff7ed)' : 'transparent',
+                        color: scoreForm.tossDecision === d ? 'var(--accent)' : 'var(--text-2)',
+                        fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                      }}>
+                      {d === 'BAT' ? '🏏 Bat' : '⚾ Bowl'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={() => setShowTossEdit(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" disabled={!scoreForm.tossWinnerId || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await updateScore(id, {
+                      team: 'team1', score: match.team1Score ?? 0,
+                      wickets: match.team1Wickets ?? 0, overs: match.team1Overs ?? 0,
+                      status: match.status,
+                      tossWinnerId: +scoreForm.tossWinnerId,
+                      tossDecision: scoreForm.tossDecision,
+                    });
+                    await loadMatchData(id);
+                    setShowTossEdit(false);
+                    showMsg('Toss updated');
+                  } catch { showMsg('Failed to update toss'); }
+                  setSaving(false);
+                }}>
+                {saving ? 'Saving…' : 'Save Toss'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showScoreModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowScoreModal(false)}>
           <div className="modal modal-lg">
@@ -900,13 +1056,23 @@ export default function LiveScoring() {
             </div>
             <form onSubmit={handleScoreUpdate}>
               <div className="modal-body">
-                <div className="form-row" style={{ marginBottom: 20 }}>
+                <div className="form-row" style={{ marginBottom: 16 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Match Status</label>
                     <select className="form-select" value={scoreForm.status} onChange={e => setScoreForm(f => ({ ...f, status: e.target.value }))}>
                       <option value="SCHEDULED">Scheduled</option>
                       <option value="LIVE">Live</option>
                       <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row" style={{ marginBottom: 16 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Toss Won By</label>
+                    <select className="form-select" value={scoreForm.tossWinnerId} onChange={e => setScoreForm(f => ({ ...f, tossWinnerId: e.target.value }))}>
+                      <option value="">— Select team —</option>
+                      <option value={match.team1Id}>{match.team1Name}</option>
+                      <option value={match.team2Id}>{match.team2Name}</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>

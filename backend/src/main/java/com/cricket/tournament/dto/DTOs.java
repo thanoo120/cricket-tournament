@@ -1,6 +1,7 @@
 package com.cricket.tournament.dto;
 
 import com.cricket.tournament.model.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -223,6 +224,7 @@ public class DTOs {
         private int balls;
         private int fours;
         private int sixes;
+        @JsonProperty("isOut")
         private boolean isOut;
         private String dismissalType;
         private int battingOrder;
@@ -239,6 +241,7 @@ public class DTOs {
         private int balls;
         private int fours;
         private int sixes;
+        @JsonProperty("isOut")
         private boolean isOut;
         private String dismissalType;
         private double strikeRate;
