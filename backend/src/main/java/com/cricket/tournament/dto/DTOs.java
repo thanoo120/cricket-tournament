@@ -296,6 +296,7 @@ public class DTOs {
         private boolean four;
         private boolean six;
         private boolean legBye;
+        private boolean bye;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
@@ -317,6 +318,7 @@ public class DTOs {
         private boolean four;
         private boolean six;
         private boolean legBye;
+        private boolean bye;
         // match state after this ball
         private Integer matchTeam1Score;
         private int matchTeam1Wickets;

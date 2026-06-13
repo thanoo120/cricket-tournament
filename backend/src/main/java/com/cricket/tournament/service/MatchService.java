@@ -126,6 +126,7 @@ public class MatchService {
         ball.setFour(request.isFour());
         ball.setSix(request.isSix());
         ball.setLegBye(request.isLegBye());
+        ball.setBye(request.isBye());
         // Note: BallRequest uses non-is prefix fields; Ball entity uses isDot etc.
         ball.setRecordedAt(LocalDateTime.now());
 
@@ -173,6 +174,7 @@ public class MatchService {
         resp.setFour(request.isFour());
         resp.setSix(request.isSix());
         resp.setLegBye(request.isLegBye());
+        resp.setBye(request.isBye());
         if (ball.getBatsman() != null) { resp.setBatsmanId(ball.getBatsman().getId()); resp.setBatsmanName(ball.getBatsman().getName()); }
         if (ball.getBowler() != null) { resp.setBowlerId(ball.getBowler().getId()); resp.setBowlerName(ball.getBowler().getName()); }
         resp.setMatchTeam1Score(saved.getTeam1Score());
@@ -205,6 +207,7 @@ public class MatchService {
             r.setFour(b.isFour());
             r.setSix(b.isSix());
             r.setLegBye(b.isLegBye());
+            r.setBye(b.isBye());
             if (b.getBatsman() != null) { r.setBatsmanId(b.getBatsman().getId()); r.setBatsmanName(b.getBatsman().getName()); }
             if (b.getBowler() != null) { r.setBowlerId(b.getBowler().getId()); r.setBowlerName(b.getBowler().getName()); }
             return r;
@@ -215,9 +218,37 @@ public class MatchService {
     public void deleteMatch(Long matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Match not found: " + matchId));
+
+        // Rollback cumulative player stats (load before cascade deletes them)
+        battingRepo.findByMatchId(matchId).forEach(bp -> {
+            Player p = bp.getPlayer();
+            if (p == null) return;
+            p.setTotalRuns(Math.max(0, p.getTotalRuns() - bp.getRuns()));
+            p.setTotalBallsFaced(Math.max(0, p.getTotalBallsFaced() - bp.getBalls()));
+            p.setTotalFours(Math.max(0, p.getTotalFours() - bp.getFours()));
+            p.setTotalSixes(Math.max(0, p.getTotalSixes() - bp.getSixes()));
+            p.setInningsBatted(Math.max(0, p.getInningsBatted() - 1));
+            if (!bp.isOut()) p.setNotOuts(Math.max(0, p.getNotOuts() - 1));
+            if (bp.getRuns() >= 100) p.setHundreds(Math.max(0, p.getHundreds() - 1));
+            else if (bp.getRuns() >= 50) p.setFifties(Math.max(0, p.getFifties() - 1));
+            playerRepository.save(p);
+        });
+        bowlingRepo.findByMatchId(matchId).forEach(bp -> {
+            Player p = bp.getPlayer();
+            if (p == null) return;
+            p.setTotalWickets(Math.max(0, p.getTotalWickets() - bp.getWickets()));
+            p.setTotalRunsConceded(Math.max(0, p.getTotalRunsConceded() - bp.getRunsConceded()));
+            p.setTotalOversBowled((int) Math.max(0, p.getTotalOversBowled() - bp.getOvers()));
+            if (bp.getWickets() >= 5) p.setFiveWicketHauls(Math.max(0, p.getFiveWicketHauls() - 1));
+            playerRepository.save(p);
+        });
+
+        // Balls have no cascade mapping on Match, so delete them explicitly first
+        // to satisfy the FK constraint before the match row is removed.
         ballRepository.deleteByMatchId(matchId);
-        battingRepo.deleteByMatchId(matchId);
-        bowlingRepo.deleteByMatchId(matchId);
+
+        // CascadeType.ALL on Match.battingPerformances and Match.bowlingPerformances
+        // handles deleting those records when the match is deleted.
         matchRepository.delete(match);
     }
 
@@ -424,13 +455,13 @@ public class MatchService {
         int extras1 = balls1.stream().mapToInt(b -> {
             int e = 0;
             if (b.isWide() || b.isNoBall()) e += 1;
-            if (b.isLegBye()) e += b.getRuns();
+            if (b.isLegBye() || b.isBye()) e += b.getRuns();
             return e;
         }).sum();
         int extras2 = balls2.stream().mapToInt(b -> {
             int e = 0;
             if (b.isWide() || b.isNoBall()) e += 1;
-            if (b.isLegBye()) e += b.getRuns();
+            if (b.isLegBye() || b.isBye()) e += b.getRuns();
             return e;
         }).sum();
 

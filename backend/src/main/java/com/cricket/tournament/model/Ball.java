@@ -42,6 +42,7 @@ public class Ball {
     private boolean isFour;
     private boolean isSix;
     private boolean isLegBye;
+    private boolean isBye;
 
     private LocalDateTime recordedAt = LocalDateTime.now();
 }

@@ -39,6 +39,7 @@ export default function AdminMatches() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm]           = useState({ matchNumber: '', venue: '', matchDateTime: '', team1Id: '', team2Id: '', overs: 3 });
   const [saving, setSaving]       = useState(false);
+  const [deleting, setDeleting]   = useState(null); // id of match being deleted
   const [endMatch, setEndMatch]   = useState(null); // match being ended
   const [endForm, setEndForm]     = useState({ winnerId: '', result: '' });
   const { isScorer }              = useAuth();
@@ -49,7 +50,7 @@ export default function AdminMatches() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const load = () => getMatches(id).then(r => setMatches(r.data));
+  const load = () => getMatches(id).then(r => setMatches(r.data || []));
 
   const handleCreate = async (e) => {
     e.preventDefault(); setSaving(true);
@@ -64,8 +65,15 @@ export default function AdminMatches() {
 
   const handleDelete = async (match) => {
     if (!window.confirm(`Delete Match #${match.matchNumber} (${match.team1Name} vs ${match.team2Name})? This cannot be undone.`)) return;
-    await deleteMatch(match.id);
-    load();
+    setDeleting(match.id);
+    try {
+      await deleteMatch(match.id);
+      load();
+    } catch {
+      alert('Failed to delete match. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const quickStatus = async (match, status) => {
@@ -289,8 +297,9 @@ export default function AdminMatches() {
                           className="btn btn-sm"
                           style={{ background: 'var(--red-muted)', color: 'var(--red)', border: '1px solid var(--red)' }}
                           onClick={() => handleDelete(m)}
+                          disabled={deleting === m.id}
                           title="Delete match">
-                          🗑
+                          {deleting === m.id ? '…' : '🗑'}
                         </button>
                       </>
                     )}

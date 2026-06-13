@@ -7,11 +7,74 @@ import {
 
 const DISMISSAL_TYPES = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket', 'Retired Hurt'];
 
+function BallChip({ b, size }) {
+  const sz = size || 28;
+  const label =
+    b.wide ? 'Wd' :
+    b.noBall ? 'Nb' :
+    b.wicket ? 'W' :
+    b.six ? '6' :
+    b.four ? '4' :
+    b.legBye ? `${b.runs}lb` :
+    b.bye ? `${b.runs}b` :
+    b.runs === 0 ? '·' : b.runs;
+
+  let bg = '#e2e8f0', color = '#334155';
+  if (b.wicket)                { bg = '#ef4444'; color = '#fff'; }
+  else if (b.six)              { bg = '#f97316'; color = '#fff'; }
+  else if (b.four)             { bg = '#22c55e'; color = '#fff'; }
+  else if (b.wide || b.noBall) { bg = '#facc15'; color = '#78350f'; }
+  else if (b.legBye || b.bye)  { bg = '#a78bfa'; color = '#fff'; }
+  else if (b.runs === 0)       { bg = '#94a3b8'; color = '#fff'; }
+
+  return (
+    <div style={{
+      width: sz, height: sz, borderRadius: '50%', background: bg, color,
+      fontSize: String(label).length > 2 ? 9 : 11, fontWeight: 700,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      {label}
+    </div>
+  );
+}
+
+function PBtn({ label, sub, onClick, disabled, danger, accent }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        flex: 1,
+        height: 52,
+        minWidth: 0,
+        background: danger ? 'rgba(239,68,68,0.85)' : accent ? '#7c3aed' : 'rgba(0,0,0,0.18)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        borderRadius: 8,
+        color: '#fff',
+        fontSize: String(label).length > 4 ? 12 : String(label).length > 2 ? 14 : 20,
+        fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 1, padding: '4px 2px', fontFamily: 'inherit',
+      }}
+    >
+      <span>{label}</span>
+      {sub && <span style={{ fontSize: 9, opacity: 0.75, fontWeight: 400 }}>{sub}</span>}
+    </button>
+  );
+}
+
+const PAD_ROW = { display: 'flex', gap: 4, padding: '4px 8px' };
+const PAD_BG = { background: '#ea580c', borderTop: '3px solid #c2410c', paddingBottom: 6 };
+const BACK_BTN = { background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1 };
+const PAD_TITLE = { color: '#fff', fontWeight: 700, fontSize: 14 };
+const PAD_HEADER = { padding: '6px 8px 2px', display: 'flex', alignItems: 'center', gap: 8 };
+
 export default function LiveScoring() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Match selection state (when no id in URL)
   const [tournaments, setTournaments] = useState([]);
   const [allMatches, setAllMatches] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState('');
@@ -29,12 +92,10 @@ export default function LiveScoring() {
   const [showBowlModal, setShowBowlModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [msg, setMsg] = useState('');
-  // pendingExtra: null | 'wide' | 'noBall' — waiting for scorer to pick extra runs
-  const [pendingExtra, setPendingExtra] = useState(null);
-  // free hit: true after a no-ball, cleared on next legal ball
+  // mode: null | 'wide' | 'noBall' | 'noBallLegBye' | 'noBallBye' | 'legBye' | 'bye' | 'moreRuns' | 'more'
+  const [mode, setMode] = useState(null);
   const [freehit, setFreehit] = useState(false);
 
-  // Current ball state
   const [strikeBatsman, setStrikeBatsman] = useState('');
   const [nonStrikeBatsman, setNonStrikeBatsman] = useState('');
   const [currentBowler, setCurrentBowler] = useState('');
@@ -65,7 +126,6 @@ export default function LiveScoring() {
     }).catch(() => setLoading(false));
   }, []);
 
-  // Load match data when id is available
   useEffect(() => {
     if (!id) return;
     loadMatchData(id);
@@ -75,7 +135,6 @@ export default function LiveScoring() {
     });
   }, [id, loadMatchData]);
 
-  // Load tournaments for fixture selector when no match selected
   useEffect(() => {
     if (id) return;
     getTournaments().then(r => {
@@ -91,32 +150,27 @@ export default function LiveScoring() {
 
   const showMsg = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
-  const handleSelectMatch = (matchId) => {
-    navigate(`/admin/matches/${matchId}/score`);
-  };
-
   const doUndoLastBall = async () => {
     if (!window.confirm('Undo the last recorded ball? This will reverse the score.')) return;
     setUndoing(true);
     try {
       await undoLastBall(id, activeInnings);
       await Promise.all([loadMatchData(id), getBalls(id).then(r => setBalls(r.data || []))]);
-      setPendingExtra(null);
+      setMode(null);
       setFreehit(false);
       showMsg('Last ball undone');
     } catch { showMsg('Nothing to undo'); }
     setUndoing(false);
   };
 
-  // Compute current over/ball numbers from loaded balls
+  // Reset pad mode when innings changes so no stale sub-screen carries over
+  useEffect(() => { setMode(null); }, [activeInnings]);
+
   useEffect(() => {
     if (!balls.length) return;
-    const inningsBalls = balls.filter(b => b.inningsType === activeInnings && !b.wide && !b.noBall);
-    const legal = inningsBalls.length;
-    const over = Math.floor(legal / 6) + 1;
-    const ball = (legal % 6) + 1;
-    setCurrentOver(over);
-    setBallInOver(ball);
+    const legal = balls.filter(b => b.inningsType === activeInnings && !b.wide && !b.noBall).length;
+    setCurrentOver(Math.floor(legal / 6) + 1);
+    setBallInOver((legal % 6) + 1);
   }, [balls, activeInnings]);
 
   const doRecordBall = async (opts) => {
@@ -141,47 +195,44 @@ export default function LiveScoring() {
         four: opts.four || false,
         six: opts.six || false,
         legBye: opts.legBye || false,
+        bye: opts.bye || false,
       });
-      const msg =
+      const m =
         opts.wicket ? 'Wicket!' :
-        opts.wide   ? 'Wide +1' :
+        opts.wide   ? `Wide +${1 + (opts.runs || 0)}` :
+        opts.noBall && opts.bye    ? `NB + ${opts.runs} Bye` :
+        opts.noBall && opts.legBye ? `NB + ${opts.runs} LB` :
         opts.noBall ? 'No Ball +1' :
+        opts.bye    ? `${opts.runs} Bye` :
+        opts.legBye ? `${opts.runs} Leg Bye` :
         opts.runs === 4 ? 'FOUR!' :
         opts.runs === 6 ? 'SIX!' :
         opts.runs === 0 ? 'Dot ball' :
         `+${opts.runs}`;
 
-      // Track free hit and clear pending extra
-      setPendingExtra(null);
+      setMode(null);
       setFreehit(!!opts.noBall);
 
-      // Strike rotation: odd legal runs = batsmen crossed
-      const isLegal   = !opts.wide && !opts.noBall;
-      const oddRuns   = isLegal && (opts.runs % 2 === 1);
+      const isLegal = !opts.wide && !opts.noBall;
+      const oddRuns = isLegal && (opts.runs % 2 === 1);
       const endOfOver = isLegal && ballInOver >= 6;
 
       if (oddRuns) {
-        // Batsmen crossed on the run
         setStrikeBatsman(nonStrikeBatsman);
         setNonStrikeBatsman(strikeBatsman);
       }
-
       if (endOfOver) {
         if (!oddRuns) {
-          // Even runs on last ball — rotate so non-striker faces next over
           setStrikeBatsman(nonStrikeBatsman);
           setNonStrikeBatsman(strikeBatsman);
         }
         setCurrentBowler('');
       }
 
-      // Show message and refresh data after state is ready
       Promise.all([loadMatchData(id), getBalls(id).then(r => setBalls(r.data || []))]).then(() => {
-        showMsg(endOfOver ? 'Over complete! Select new bowler' : msg);
+        showMsg(endOfOver ? 'Over complete! Select new bowler.' : m);
       });
-    } catch (e) {
-      showMsg('Failed to record ball');
-    }
+    } catch { showMsg('Failed to record ball'); }
     setSaving(false);
   };
 
@@ -230,7 +281,7 @@ export default function LiveScoring() {
     setSaving(false);
   };
 
-  // --- Fixture selector screen ---
+  // ---- Fixture selector ----
   if (!id) {
     const liveOrScheduled = allMatches.filter(m => m.status === 'LIVE' || m.status === 'SCHEDULED');
     return (
@@ -247,8 +298,8 @@ export default function LiveScoring() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {liveOrScheduled.map(m => (
-              <div key={m.id} className="card" style={{ padding: '16px 20px', cursor: 'pointer', border: m.status === 'LIVE' ? '1px solid var(--accent)' : undefined }}
-                onClick={() => handleSelectMatch(m.id)}>
+              <div key={m.id} className="card" style={{ padding: '16px 20px', cursor: 'pointer', border: m.status === 'LIVE' ? '2px solid var(--accent)' : undefined }}
+                onClick={() => navigate(`/admin/matches/${m.id}/score`)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontWeight: 600 }}>{m.team1Name} vs {m.team2Name}</span>
@@ -282,385 +333,564 @@ export default function LiveScoring() {
   const currentOverBalls = activeBalls.filter(b => b.overNumber === currentOver);
   const maxOvers = match.overs || 3;
   const crr = activeOvers > 0 ? (activeScore / activeOvers).toFixed(2) : '0.00';
-
-  // Innings completion checks
-  const oversComplete = Math.floor(activeOvers) >= maxOvers;
+  const activeOversVal = activeOvers ?? 0;
+  const oversComplete = Math.floor(activeOversVal) >= maxOvers;
   const allOut = (activeWickets ?? 0) >= 10;
   const inningsComplete = isLive && (oversComplete || allOut);
-  // Chase complete: 2nd innings chased down target
   const target = match.team1Score != null ? match.team1Score + 1 : null;
   const chaseWon = activeInnings === 'SECOND' && target != null && activeScore >= target;
 
-  return (
-    <div className="live-console">
-      {/* Header */}
-      <div className="live-score-header">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="live-badge-row">
-            {isLive && <span className="badge badge-live">LIVE</span>}
-            {match.status === 'COMPLETED' && <span className="badge badge-completed">FINAL</span>}
-            <span className="live-match-name">{match.team1Name} vs {match.team2Name}</span>
-            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{maxOvers} overs/team</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
-            <span className="live-score-main">{activeScore}/{activeWickets ?? 0}</span>
-            <span className="live-score-overs">({activeOvers ?? 0} ov)</span>
-          </div>
+  const legalBallsPlayed = Math.floor(activeOversVal) * 6 + Math.round((activeOversVal % 1) * 10);
+  const needMoreBalls = Math.max(0, maxOvers * 6 - legalBallsPlayed);
+
+  // Extras from balls
+  const extraRuns = activeBalls.reduce((s, b) =>
+    s + (b.wide ? 1 : 0) + (b.noBall ? 1 : 0) + (b.legBye ? b.runs : 0) + (b.bye ? b.runs : 0), 0);
+
+  // Partnership since last wicket
+  const lastWicketIdx = activeBalls.reduce((idx, b, i) => b.wicket ? i : idx, -1);
+  const partnershipBalls = activeBalls.slice(lastWicketIdx + 1);
+  const partnership = {
+    runs: partnershipBalls.reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0),
+    balls: partnershipBalls.filter(b => !b.wide && !b.noBall).length,
+  };
+
+  // Live stats computed from balls
+  const batsmanStats = (pid) => {
+    if (!pid) return { runs: 0, balls: 0, fours: 0, sixes: 0, sr: '-' };
+    const myBalls = activeBalls.filter(b => String(b.batsmanId) === String(pid) && !b.wide);
+    const runs = myBalls.filter(b => !b.legBye && !b.bye).reduce((s, b) => s + b.runs, 0);
+    const bf = myBalls.length;
+    return {
+      runs, balls: bf, fours: myBalls.filter(b => b.four).length, sixes: myBalls.filter(b => b.six).length,
+      sr: bf > 0 ? ((runs / bf) * 100).toFixed(0) : '-',
+    };
+  };
+
+  const bowlerStats = (bid) => {
+    if (!bid) return { overs: '0.0', runs: 0, wickets: 0, eco: '-' };
+    const myBalls = activeBalls.filter(b => String(b.bowlerId) === String(bid));
+    const legal = myBalls.filter(b => !b.wide && !b.noBall).length;
+    const runs = myBalls.reduce((s, b) => {
+      const pen = (b.wide || b.noBall) ? 1 : 0;
+      const bat = (!b.legBye && !b.bye) ? b.runs : 0;
+      return s + bat + pen;
+    }, 0);
+    const wickets = myBalls.filter(b => b.wicket).length;
+    const ov = `${Math.floor(legal / 6)}.${legal % 6}`;
+    const eco = legal > 0 ? (runs / (legal / 6)).toFixed(1) : '-';
+    return { overs: ov, runs, wickets, eco };
+  };
+
+  const striker = battingTeamPlayers.find(p => String(p.id) === String(strikeBatsman));
+  const nonStriker = battingTeamPlayers.find(p => String(p.id) === String(nonStrikeBatsman));
+  const bowler = bowlingTeamPlayers.find(p => String(p.id) === String(currentBowler));
+  const strikerStats = batsmanStats(strikeBatsman);
+  const nonStrikerStats = batsmanStats(nonStrikeBatsman);
+  const bStats = bowlerStats(currentBowler);
+
+  const needRuns = target ? target - activeScore : null;
+
+  // ---- Ball pad ----
+  const renderBallPad = () => {
+    if (!strikeBatsman || !currentBowler) {
+      return (
+        <div style={{ ...PAD_BG, padding: '14px 12px', textAlign: 'center' }}>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>
+            {!strikeBatsman ? 'Select striker above to begin scoring' : 'Select bowler above to begin scoring'}
+          </span>
         </div>
-        <div className="live-stat-box"><div className="live-stat-label">CRR</div><div className="live-stat-value">{crr}</div></div>
-        <div className="live-stat-box"><div className="live-stat-label">Over</div><div className="live-stat-value">{currentOver}/{maxOvers}</div></div>
-        {match.team1Score != null && activeInnings === 'SECOND' && (
-          <div className="live-stat-box">
-            <div className="live-stat-label">Target</div>
-            <div className="live-stat-value">{match.team1Score + 1}</div>
+      );
+    }
+
+    if (mode === 'wide') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>Wide — select overthrow runs</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[0, 1, 2, 3, 4, 5, 6].map(r => (
+            <PBtn key={r} label={r === 0 ? 'Wd' : `${r}+Wd`} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, wide: true, four: r === 4 })} />
+          ))}
+          <PBtn label="Run Out" sub="on wide" danger disabled={saving}
+            onClick={() => doRecordBall({ runs: 0, wide: true, wicket: true })} />
+        </div>
+      </div>
+    );
+
+    if (mode === 'noBall') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>No Ball — select runs off bat</span>
+        </div>
+        <div style={PAD_ROW}>
+          {[0, 1, 2, 3, 4, 6].map(r => (
+            <PBtn key={r} label={r === 0 ? 'NB' : `${r}NB`} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, noBall: true, four: r === 4, six: r === 6 })} />
+          ))}
+        </div>
+        <div style={PAD_ROW}>
+          <PBtn label="Leg Byes" sub="+NB" onClick={() => setMode('noBallLegBye')} />
+          <PBtn label="Byes" sub="+NB" onClick={() => setMode('noBallBye')} />
+          <PBtn label="4 5 6 7" sub="more +NB" onClick={() => setMode('noBallMore')} />
+        </div>
+      </div>
+    );
+
+    if (mode === 'noBallMore') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode('noBall')}>←</button>
+          <span style={PAD_TITLE}>No Ball + More Runs</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[4, 5, 6, 7, 8, 9, 10].map(r => (
+            <PBtn key={r} label={`${r}NB`} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, noBall: true, four: r === 4, six: r === 6 })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'noBallLegBye') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode('noBall')}>←</button>
+          <span style={PAD_TITLE}>No Ball + Leg Byes</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5, 6, 7].map(r => (
+            <PBtn key={r} label={`${r}LB`} sub="+ NB" disabled={saving}
+              onClick={() => doRecordBall({ runs: r, noBall: true, legBye: true })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'noBallBye') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode('noBall')}>←</button>
+          <span style={PAD_TITLE}>No Ball + Byes</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5, 6, 7].map(r => (
+            <PBtn key={r} label={`${r}B`} sub="+ NB" disabled={saving}
+              onClick={() => doRecordBall({ runs: r, noBall: true, bye: true })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'legBye') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>Leg Byes</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5, 6, 7].map(r => (
+            <PBtn key={r} label={`${r}LB`} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, legBye: true })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'bye') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>Byes</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5, 6, 7].map(r => (
+            <PBtn key={r} label={`${r}B`} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, bye: true })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'moreRuns') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>More Runs</span>
+        </div>
+        <div style={{ ...PAD_ROW, flexWrap: 'wrap' }}>
+          {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map(r => (
+            <PBtn key={r} label={r} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, four: r === 4, six: r === 6 })} />
+          ))}
+        </div>
+      </div>
+    );
+
+    if (mode === 'more') return (
+      <div style={PAD_BG}>
+        <div style={PAD_HEADER}>
+          <button style={BACK_BTN} onClick={() => setMode(null)}>←</button>
+          <span style={PAD_TITLE}>More Options</span>
+        </div>
+        <div style={PAD_ROW}>
+          <PBtn label="End Innings" onClick={() => { setMode(null); setActiveInnings(activeInnings === 'FIRST' ? 'SECOND' : 'FIRST'); }} />
+          <PBtn label="+ Bat" onClick={() => { setMode(null); setBatForm(f => ({ ...f, inningsType: activeInnings })); setShowBatModal(true); }} />
+          <PBtn label="+ Bowl" onClick={() => { setMode(null); setBowlForm(f => ({ ...f, inningsType: activeInnings })); setShowBowlModal(true); }} />
+          <PBtn label="Settings" onClick={() => {
+            setMode(null);
+            setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: '', tossDecision: match.tossDecision || 'BAT', winnerId: '', result: match.result || '', playerOfMatchId: '' });
+            setShowScoreModal(true);
+          }} />
+        </div>
+      </div>
+    );
+
+    // Normal pad
+    return (
+      <div style={PAD_BG}>
+        {freehit && (
+          <div style={{ background: '#7c3aed', textAlign: 'center', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 0' }}>
+            ⚡ FREE HIT — only run out allowed
           </div>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/admin/matches/' + id + '/score')}>
-            † Back
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={() => {
-            setScoreForm({
-              team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '',
-              team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '',
-              team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '',
-              status: match.status || 'LIVE', tossWinnerId: '', tossDecision: match.tossDecision || 'BAT',
-              winnerId: '', result: match.result || '', playerOfMatchId: ''
-            });
-            setShowScoreModal(true);
-          }}>Settings</button>
+        {/* Row 1: 1 2 3 4 6 */}
+        <div style={PAD_ROW}>
+          {[1, 2, 3, 4, 6].map(r => (
+            <PBtn key={r} label={r} disabled={saving}
+              onClick={() => doRecordBall({ runs: r, four: r === 4, six: r === 6 })} />
+          ))}
+        </div>
+        {/* Row 2: LB Bye Wide NB · */}
+        <div style={PAD_ROW}>
+          <PBtn label="LB" sub="leg bye" onClick={() => setMode('legBye')} disabled={saving} />
+          <PBtn label="Bye" onClick={() => setMode('bye')} disabled={saving} />
+          <PBtn label="Wide" onClick={() => setMode('wide')} disabled={saving} />
+          <PBtn label="NB" sub="no ball" onClick={() => setMode('noBall')} disabled={saving} />
+          <PBtn label="·" sub="dot" disabled={saving} onClick={() => doRecordBall({ runs: 0, dot: true })} />
+        </div>
+        {/* Row 3: More ⇄ 4567 Undo Out */}
+        <div style={PAD_ROW}>
+          <PBtn label="More" onClick={() => setMode('more')} disabled={saving} />
+          <PBtn label="⇄" sub="rotate" disabled={saving} onClick={() => {
+            const tmp = strikeBatsman;
+            setStrikeBatsman(nonStrikeBatsman);
+            setNonStrikeBatsman(tmp);
+          }} />
+          <PBtn label="4567" sub="more runs" onClick={() => setMode('moreRuns')} disabled={saving} />
+          <PBtn label="Undo" disabled={undoing || saving} onClick={doUndoLastBall} />
+          <PBtn label="Out" sub={freehit ? 'run out' : 'wicket'} danger disabled={saving}
+            onClick={() => doRecordBall({ runs: 0, wicket: true })} />
+        </div>
+      </div>
+    );
+  };
+
+  const tblHead = { textAlign: 'left', padding: '4px 10px', fontWeight: 500, color: '#64748b', fontSize: 11 };
+  const tblHeadR = { ...tblHead, textAlign: 'right', width: 32 };
+  const tblCell = { padding: '5px 10px', fontSize: 12 };
+  const tblCellR = { ...tblCell, textAlign: 'right' };
+  const selStyle = { fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4, color: '#64748b', background: '#f8fafc', padding: '2px 4px', marginLeft: 6 };
+
+  return (
+    <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f1f5f9', position: 'relative' }}>
+
+      {/* TOP NAV */}
+      <div style={{ background: '#0f172a', color: '#fff', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0 }}>←</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, opacity: 0.55, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {match.team1Name} vs {match.team2Name} · Match #{match.matchNumber}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            {activeInnings === 'FIRST' ? match.team1Name : match.team2Name} — {activeInnings === 'FIRST' ? '1st' : '2nd'} Innings
+          </div>
+        </div>
+        {isLive && <span style={{ fontSize: 10, fontWeight: 700, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>LIVE</span>}
+        {match.status === 'COMPLETED' && <span style={{ fontSize: 10, fontWeight: 700, background: '#64748b', color: '#fff', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>FINAL</span>}
+        <button
+          onClick={() => { setScoreForm({ team1Score: match.team1Score ?? '', team1Wickets: match.team1Wickets ?? '', team1Overs: match.team1Overs ?? '', team2Score: match.team2Score ?? '', team2Wickets: match.team2Wickets ?? '', team2Overs: match.team2Overs ?? '', status: match.status || 'LIVE', tossWinnerId: '', tossDecision: match.tossDecision || 'BAT', winnerId: '', result: match.result || '', playerOfMatchId: '' }); setShowScoreModal(true); }}
+          style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+          ⚙
+        </button>
+      </div>
+
+      {/* SCORE BAND */}
+      <div style={{ background: '#1e293b', color: '#fff', padding: '12px 14px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 48, fontWeight: 900, lineHeight: 1, fontFamily: 'Rajdhani, monospace' }}>
+            {activeScore}/{activeWickets ?? 0}
+          </span>
+          <span style={{ fontSize: 18, opacity: 0.65, fontFamily: 'Rajdhani, monospace' }}>({activeOvers ?? 0} ov)</span>
+          {activeInnings === 'SECOND' && needRuns != null && needRuns > 0 && (
+            <span style={{ fontSize: 13, opacity: 0.85, marginLeft: 'auto' }}>
+              Need {needRuns} off {needMoreBalls} balls
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 18, marginTop: 8, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Extras', val: extraRuns },
+            { label: 'CRR', val: crr },
+            { label: 'Overs', val: `${currentOver - 1}.${ballInOver - 1}/${maxOvers}` },
+            { label: 'Partnership', val: `${partnership.runs}(${partnership.balls})` },
+            ...(target ? [{ label: 'Target', val: target }] : []),
+          ].map(({ label, val }) => (
+            <div key={label}>
+              <div style={{ fontSize: 9, opacity: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{val}</div>
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* THIS OVER */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, minWidth: 58 }}>This Over</span>
+        <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'nowrap', overflowX: 'auto' }}>
+          {currentOverBalls.length === 0
+            ? <span style={{ fontSize: 12, color: '#94a3b8' }}>No balls yet</span>
+            : currentOverBalls.map(b => <BallChip key={b.id} b={b} />)}
+        </div>
+        <span style={{ fontSize: 11, color: '#64748b', flexShrink: 0 }}>
+          {currentOverBalls.filter(b => !b.wide && !b.noBall).length}/6
+        </span>
+      </div>
+
+      {/* LIVE PLAYERS */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 12px', flexShrink: 0 }}>
+        {/* Batting table */}
+        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Batting</div>
+        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ color: '#94a3b8', fontSize: 10 }}>
+              <th style={{ textAlign: 'left', fontWeight: 400, paddingBottom: 2 }}>Batter</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>R</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>B</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>4s</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>6s</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 36 }}>SR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ paddingBottom: 3 }}>
+                <span style={{ fontWeight: 700 }}>{striker ? striker.name : '—'}</span>
+                {striker && <span style={{ fontSize: 11, marginLeft: 3, color: '#f97316' }}>*</span>}
+                <select value={strikeBatsman} onChange={e => setStrikeBatsman(e.target.value)} style={selStyle}>
+                  <option value="">— set striker —</option>
+                  {battingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </td>
+              <td style={{ textAlign: 'right', fontWeight: 700 }}>{strikerStats.runs}</td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{strikerStats.balls}</td>
+              <td style={{ textAlign: 'right', color: '#22c55e' }}>{strikerStats.fours}</td>
+              <td style={{ textAlign: 'right', color: '#f97316' }}>{strikerStats.sixes}</td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{strikerStats.sr}</td>
+            </tr>
+            <tr>
+              <td style={{ paddingBottom: 2 }}>
+                <span style={{ color: '#475569' }}>{nonStriker ? nonStriker.name : '—'}</span>
+                <select value={nonStrikeBatsman} onChange={e => setNonStrikeBatsman(e.target.value)} style={selStyle}>
+                  <option value="">— set non-striker —</option>
+                  {battingTeamPlayers.filter(p => String(p.id) !== strikeBatsman).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </td>
+              <td style={{ textAlign: 'right' }}>{nonStrikerStats.runs}</td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{nonStrikerStats.balls}</td>
+              <td style={{ textAlign: 'right', color: '#22c55e' }}>{nonStrikerStats.fours}</td>
+              <td style={{ textAlign: 'right', color: '#f97316' }}>{nonStrikerStats.sixes}</td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{nonStrikerStats.sr}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Bowling table */}
+        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, marginBottom: 4 }}>Bowling</div>
+        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ color: '#94a3b8', fontSize: 10 }}>
+              <th style={{ textAlign: 'left', fontWeight: 400, paddingBottom: 2 }}>Bowler</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 36 }}>O</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>R</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 28 }}>W</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, width: 36 }}>Eco</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span style={{ fontWeight: 600, color: '#1e293b' }}>{bowler ? bowler.name : '—'}</span>
+                <select value={currentBowler} onChange={e => setCurrentBowler(e.target.value)} style={selStyle}>
+                  <option value="">— set bowler —</option>
+                  {bowlingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{bStats.overs}</td>
+              <td style={{ textAlign: 'right' }}>{bStats.runs}</td>
+              <td style={{ textAlign: 'right', fontWeight: bStats.wickets >= 3 ? 700 : 400, color: bStats.wickets >= 3 ? '#22c55e' : 'inherit' }}>{bStats.wickets}</td>
+              <td style={{ textAlign: 'right', color: '#64748b' }}>{bStats.eco}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Alerts */}
       {msg && (
-        <div style={{ padding: '8px 20px', background: msg.includes('Failed') ? 'var(--red-muted)' : 'var(--accent-muted)', color: msg.includes('Failed') ? 'var(--red)' : 'var(--accent)', fontSize: 13, fontWeight: 600, borderBottom: '1px solid var(--card-border)' }}>
+        <div style={{ padding: '8px 12px', background: msg.includes('Failed') ? '#fef2f2' : '#f0fdf4', color: msg.includes('Failed') ? '#dc2626' : '#16a34a', fontSize: 13, fontWeight: 600, textAlign: 'center', flexShrink: 0 }}>
           {msg}
         </div>
       )}
-
-      <div className="live-console-body">
-        {/* LEFT: Player selectors + Ball pad */}
-        <div className="lc-left">
-          {/* Innings Selector */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className={`btn btn-sm ${activeInnings === 'FIRST' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveInnings('FIRST')}>{match.team1Name} (1st)</button>
-            <button className={`btn btn-sm ${activeInnings === 'SECOND' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveInnings('SECOND')}>{match.team2Name} (2nd)</button>
-          </div>
-
-          {/* Player Selection */}
-          <div className="lc-panel">
-            <div className="lc-panel-header"><span className="lc-panel-label">Select Players</span></div>
-            <div className="modal-body" style={{ padding: '12px 14px' }}>
-              <div className="form-group" style={{ marginBottom: 10 }}>
-                <label className="form-label">Striker (Batsman)</label>
-                <select className="form-select" value={strikeBatsman} onChange={e => setStrikeBatsman(e.target.value)}>
-                  <option value="">-- Select batsman --</option>
-                  {battingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group" style={{ marginBottom: 10 }}>
-                <label className="form-label">Non-Striker</label>
-                <select className="form-select" value={nonStrikeBatsman} onChange={e => setNonStrikeBatsman(e.target.value)}>
-                  <option value="">-- Select batsman --</option>
-                  {battingTeamPlayers.filter(p => String(p.id) !== strikeBatsman).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Bowler</label>
-                <select className="form-select" value={currentBowler} onChange={e => setCurrentBowler(e.target.value)}>
-                  <option value="">-- Select bowler --</option>
-                  {bowlingTeamPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              {strikeBatsman && currentBowler && (
-                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-                  Over {currentOver}.{ballInOver - 1} — Ready to score
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Innings completion / chase won alert */}
-          {(inningsComplete || chaseWon) && (
-            <div style={{ background: chaseWon ? 'var(--green)' : 'var(--accent)', color: '#fff', borderRadius: 8, padding: '12px 14px', fontWeight: 700, fontSize: 14, textAlign: 'center', marginBottom: 4 }}>
-              {chaseWon
-                ? `🏆 ${match.team2Name} wins the match!`
-                : allOut
-                  ? `All out! ${match.team1Name || match.team2Name} innings complete.`
-                  : `Over limit reached — innings complete.`}
-              {!chaseWon && activeInnings === 'FIRST' && (
-                <div style={{ marginTop: 6 }}>
-                  <button className="btn btn-sm" style={{ background: '#fff', color: 'var(--accent)', fontWeight: 700 }}
-                    onClick={() => setActiveInnings('SECOND')}>
-                    Switch to 2nd Innings →
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Free hit banner */}
-          {freehit && isLive && (
-            <div style={{ background: '#7c3aed', color: '#fff', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>
-              ⚡ FREE HIT — batsman can only be Run Out
-            </div>
-          )}
-
-          {/* Ball Pad */}
-          {isLive && !inningsComplete && !chaseWon && (
-            <div className="lc-panel">
-              <div className="lc-panel-header" style={{ justifyContent: 'space-between' }}>
-                <span className="lc-panel-label">
-                  {pendingExtra === 'wide' ? '⚡ Wide — select overthrow runs' :
-                   pendingExtra === 'noBall' ? '⚡ No Ball — select batsman runs' :
-                   `Record Ball — Over ${currentOver}, Ball ${ballInOver}`}
-                </span>
-                <button
-                  className="btn btn-sm"
-                  style={{ background: 'var(--red-muted)', color: 'var(--red)', border: '1px solid var(--red)', fontSize: 11, padding: '2px 8px' }}
-                  disabled={undoing || saving}
-                  onClick={doUndoLastBall}>
-                  ↩ Undo
-                </button>
-              </div>
-
-              {pendingExtra ? (
-                /* Extra runs picker — shown after WD or NB is pressed */
-                <div className="add-event-pad">
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '4px 2px 8px' }}>
-                    {pendingExtra === 'wide'
-                      ? 'Runs from overthrows (wide penalty +1 is automatic):'
-                      : 'Runs scored by batsman (no-ball penalty +1 is automatic):'}
-                  </div>
-                  <div className="event-grid">
-                    {(pendingExtra === 'noBall' ? [0, 1, 2, 3, 4, 6] : [0, 1, 2, 3, 4]).map(r => (
-                      <button key={r} className={`event-btn${r === 4 ? ' boundary' : r === 6 ? ' maximum' : ''}`}
-                        disabled={saving}
-                        onClick={() => doRecordBall({
-                          runs: r,
-                          wide: pendingExtra === 'wide',
-                          noBall: pendingExtra === 'noBall',
-                          four: r === 4, six: r === 6,
-                        })}>
-                        <span className="event-btn-num">{r}</span>
-                        <span className="event-btn-label">{r === 0 ? 'No runs' : r === 1 ? 'Run' : 'Runs'}</span>
-                      </button>
-                    ))}
-                    {/* Run out on wide */}
-                    {pendingExtra === 'wide' && (
-                      <button className="event-btn wicket-btn" disabled={saving}
-                        onClick={() => doRecordBall({ runs: 0, wide: true, wicket: true })}>
-                        <span className="event-btn-num">W</span>
-                        <span className="event-btn-label">Run Out</span>
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setPendingExtra(null)}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                /* Normal ball pad */
-                <div className="add-event-pad">
-                  <div className="event-grid">
-                    {[0, 1, 2, 3].map(r => (
-                      <button key={r} className="event-btn" disabled={saving} onClick={() => doRecordBall({ runs: r, dot: r === 0 })}>
-                        <span className="event-btn-num">{r}</span>
-                        <span className="event-btn-label">{r === 0 ? 'Dot' : r === 1 ? 'Run' : 'Runs'}</span>
-                      </button>
-                    ))}
-                    <button className="event-btn boundary" disabled={saving} onClick={() => doRecordBall({ runs: 4, four: true })}>
-                      <span className="event-btn-num">4</span>
-                      <span className="event-btn-label">Four</span>
-                    </button>
-                    <button className="event-btn maximum" disabled={saving} onClick={() => doRecordBall({ runs: 6, six: true })}>
-                      <span className="event-btn-num">6</span>
-                      <span className="event-btn-label">Six</span>
-                    </button>
-                  </div>
-                  <div className="event-extras">
-                    <button className="event-extra-btn" disabled={saving} onClick={() => setPendingExtra('wide')}>
-                      <span className="extra-code">WD</span> Wide
-                    </button>
-                    <button className="event-extra-btn" disabled={saving} onClick={() => setPendingExtra('noBall')}>
-                      <span className="extra-code">NB</span> No Ball
-                    </button>
-                    <button className="event-extra-btn" disabled={saving} onClick={() => doRecordBall({ runs: 1, legBye: true })}>
-                      <span className="extra-code">LB</span> Leg Bye
-                    </button>
-                    <button className="event-btn wicket-btn" style={{ padding: '8px 6px' }} disabled={saving || freehit}
-                      title={freehit ? 'Free hit — batsman cannot be out except run out' : ''}
-                      onClick={() => doRecordBall({ runs: 0, wicket: true })}>
-                      <span className="event-btn-num">W</span>
-                      <span className="event-btn-label">{freehit ? 'Run Out' : 'Wicket'}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+      {(inningsComplete || chaseWon) && (
+        <div style={{ background: chaseWon ? '#16a34a' : '#f97316', color: '#fff', padding: '12px 14px', textAlign: 'center', fontWeight: 700, flexShrink: 0 }}>
+          {chaseWon
+            ? `🏆 ${match.team2Name} wins the match!`
+            : allOut
+              ? `All out! Innings complete.`
+              : `Over limit reached — innings complete.`}
+          {!chaseWon && activeInnings === 'FIRST' && (
+            <button onClick={() => setActiveInnings('SECOND')}
+              style={{ marginLeft: 12, background: '#fff', color: '#f97316', border: 'none', borderRadius: 6, padding: '4px 12px', fontWeight: 700, cursor: 'pointer' }}>
+              2nd Innings →
+            </button>
           )}
         </div>
+      )}
 
-        {/* MIDDLE: Current Over + Scorecard */}
-        <div className="lc-middle">
-          {/* This Over */}
-          <div className="lc-panel">
-            <div className="lc-panel-header">
-              <span className="lc-panel-label">This Over ({currentOver}/{maxOvers})</span>
-            </div>
-            <div style={{ padding: '10px 14px' }}>
-              <div className="over-balls" style={{ flexWrap: 'wrap' }}>
-                {currentOverBalls.map((b, i) => (
-                  <div key={b.id} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : b.wide ? 'extra' : b.noBall ? 'extra' : ''}`}>
-                    {b.wide ? 'Wd' : b.noBall ? 'Nb' : b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? '·' : b.runs}
-                  </div>
-                ))}
-                {!currentOverBalls.length && <span style={{ color: 'var(--text-3)', fontSize: 13 }}>No balls bowled yet this over</span>}
-              </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
-                Balls: {currentOverBalls.filter(b => !b.wide && !b.noBall).length}/6
-              </div>
-            </div>
-          </div>
+      {/* SCROLLABLE CONTENT */}
+      <div style={{ flex: 1, paddingBottom: isLive && !inningsComplete && !chaseWon ? '4px' : '16px' }}>
 
-          {/* Overs Summary */}
-          <div className="lc-panel">
-            <div className="lc-panel-header"><span className="lc-panel-label">Overs Summary</span></div>
-            <div style={{ padding: '8px 14px' }}>
-              {Array.from({ length: maxOvers }, (_, i) => i + 1).map(ov => {
-                // eslint-disable-next-line no-unused-vars
-                const ovBalls = activeBalls.filter(b => b.overNumber === ov && !b.wide && !b.noBall);
-                const runs = activeBalls.filter(b => b.overNumber === ov).reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0);
-                const wkts = activeBalls.filter(b => b.overNumber === ov && b.wicket).length;
-                return (
-                  <div key={ov} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--card-border)', fontSize: 13 }}>
-                    <span style={{ minWidth: 52, color: 'var(--text-2)', fontWeight: 600 }}>Over {ov}</span>
-                    <div style={{ display: 'flex', gap: 3 }}>
-                      {Array.from({ length: 6 }, (_, j) => {
-                        const b = activeBalls.filter(x => x.overNumber === ov && !x.wide && !x.noBall)[j];
-                        if (!b) return <div key={j} className="over-ball" style={{ width: 20, height: 20, fontSize: 10, opacity: 0.3 }}>-</div>;
-                        return (
-                          <div key={j} className={`over-ball ${b.four ? 'four' : b.six ? 'six' : b.wicket ? 'wicket' : b.dot ? 'dot' : ''}`} style={{ width: 20, height: 20, fontSize: 10 }}>
-                            {b.wicket ? 'W' : b.four ? '4' : b.six ? '6' : b.runs === 0 ? '·' : b.runs}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <span style={{ marginLeft: 'auto', color: 'var(--text-2)' }}>{runs} runs{wkts > 0 ? `, ${wkts}W` : ''}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Performance Records */}
-          <div className="lc-panel">
-            <div className="lc-panel-header">
-              <span className="lc-panel-label">Performance Records</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setBatForm(f => ({ ...f, inningsType: activeInnings })); setShowBatModal(true); }}>+ Bat</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setBowlForm(f => ({ ...f, inningsType: activeInnings })); setShowBowlModal(true); }}>+ Bowl</button>
-              </div>
-            </div>
-            <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--text-3)' }}>
-              Add batting/bowling performance summaries after each innings.
-            </div>
-          </div>
+        {/* Innings toggle + scorecard link */}
+        <div style={{ display: 'flex', padding: '10px 12px', gap: 8, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
+          <button className={`btn btn-sm ${activeInnings === 'FIRST' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setActiveInnings('FIRST')}>{match.team1Name} (1st)</button>
+          <button className={`btn btn-sm ${activeInnings === 'SECOND' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setActiveInnings('SECOND')}>{match.team2Name} (2nd)</button>
+          <Link to={`/matches/${id}/scorecard`} target="_blank"
+            style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
+            Full Scorecard ↗
+          </Link>
         </div>
 
-        {/* RIGHT: Scorecard */}
-        <div className="lc-right">
-          <div className="sc-header">
-            <span className="sc-label">Scorecard</span>
-            <Link to={`/matches/${id}/scorecard`} target="_blank" className="live-feedback-btn">Full View</Link>
+        {/* Scorecard tables */}
+        {[
+          { label: `1st — ${match.team1Name}`, score: match.team1Score, wkts: match.team1Wickets, overs: match.team1Overs, innings: innings1 },
+          { label: `2nd — ${match.team2Name}`, score: match.team2Score, wkts: match.team2Wickets, overs: match.team2Overs, innings: innings2 },
+        ].map(({ label, score, wkts, overs, innings }) => (
+          <div key={label} style={{ background: '#fff', marginTop: 8, borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{label}</span>
+              <span style={{ fontSize: 15, fontWeight: 800, fontFamily: 'Rajdhani, monospace' }}>
+                {score ?? '-'}/{wkts ?? 0} ({overs ?? 0})
+              </span>
+            </div>
+            {innings?.batting?.length > 0 && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={tblHead}>Batter</th>
+                      <th style={tblHeadR}>R</th>
+                      <th style={tblHeadR}>B</th>
+                      <th style={tblHeadR}>4s</th>
+                      <th style={tblHeadR}>6s</th>
+                      <th style={tblHeadR}>SR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {innings.batting.map(b => (
+                      <tr key={b.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                        <td style={tblCell}>{b.playerName}{!b.isOut && '*'}</td>
+                        <td style={{ ...tblCellR, fontWeight: 700 }}>{b.runs}</td>
+                        <td style={{ ...tblCellR, color: '#64748b' }}>{b.balls}</td>
+                        <td style={{ ...tblCellR, color: '#22c55e' }}>{b.fours}</td>
+                        <td style={{ ...tblCellR, color: '#f97316' }}>{b.sixes}</td>
+                        <td style={{ ...tblCellR, color: '#64748b' }}>{b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(0) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {innings?.bowling?.length > 0 && (
+              <div style={{ overflowX: 'auto', borderTop: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 240 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={tblHead}>Bowler</th>
+                      <th style={tblHeadR}>O</th>
+                      <th style={tblHeadR}>R</th>
+                      <th style={tblHeadR}>W</th>
+                      <th style={tblHeadR}>Eco</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {innings.bowling.map(b => (
+                      <tr key={b.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                        <td style={tblCell}>{b.playerName}</td>
+                        <td style={{ ...tblCellR, color: '#64748b' }}>{b.overs}</td>
+                        <td style={tblCellR}>{b.runsConceded}</td>
+                        <td style={{ ...tblCellR, fontWeight: b.wickets >= 3 ? 700 : 400, color: b.wickets >= 3 ? '#22c55e' : 'inherit' }}>{b.wickets}</td>
+                        <td style={{ ...tblCellR, color: '#64748b' }}>{b.overs > 0 ? (b.runsConceded / b.overs).toFixed(1) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!innings?.batting?.length && !innings?.bowling?.length && (
+              <div style={{ padding: '12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>No records yet</div>
+            )}
+            {isLive && (
+              <div style={{ padding: '8px 12px', display: 'flex', gap: 8, borderTop: '1px solid #f1f5f9' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBatForm(f => ({ ...f, inningsType: activeInnings })); setShowBatModal(true); }}>+ Batting</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBowlForm(f => ({ ...f, inningsType: activeInnings })); setShowBowlModal(true); }}>+ Bowling</button>
+              </div>
+            )}
           </div>
+        ))}
 
-          {[
-            { label: '1st Innings', innings: innings1, team: match.team1Name, score: match.team1Score, wkts: match.team1Wickets, overs: match.team1Overs },
-            { label: '2nd Innings', innings: innings2, team: match.team2Name, score: match.team2Score, wkts: match.team2Wickets, overs: match.team2Overs },
-          ].map(({ label, innings, team, score, wkts, overs }) => (
-            <div key={label} className="lc-panel">
-              <div className="lc-panel-header">
-                <span className="lc-panel-label">{team}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', fontFamily: 'Rajdhani' }}>
-                  {score ?? '-'}/{wkts ?? 0} ({overs ?? 0})
+        {/* Overs summary */}
+        <div style={{ background: '#fff', marginTop: 8, borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+            Over by Over — {activeInnings === 'FIRST' ? match.team1Name : match.team2Name}
+          </div>
+          {Array.from({ length: Math.max(currentOver, 1) }, (_, i) => i + 1).map(ov => {
+            const ovBalls = activeBalls.filter(b => b.overNumber === ov);
+            const runs = ovBalls.reduce((s, b) => s + b.runs + (b.wide || b.noBall ? 1 : 0), 0);
+            const wkts = ovBalls.filter(b => b.wicket).length;
+            return (
+              <div key={ov} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderTop: '1px solid #f1f5f9', fontSize: 12 }}>
+                <span style={{ minWidth: 40, color: '#64748b', fontWeight: 600 }}>Ov {ov}</span>
+                <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+                  {Array.from({ length: 6 }, (_, j) => {
+                    const b = activeBalls.filter(x => x.overNumber === ov && !x.wide && !x.noBall)[j];
+                    return b
+                      ? <BallChip key={j} b={b} size={22} />
+                      : <div key={j} style={{ width: 22, height: 22, borderRadius: '50%', background: '#f1f5f9', border: '1px dashed #cbd5e1', flexShrink: 0 }} />;
+                  })}
+                </div>
+                <span style={{ color: '#64748b', minWidth: 48, textAlign: 'right' }}>
+                  {runs}R{wkts ? `, ${wkts}W` : ''}
                 </span>
               </div>
-              {innings?.batting?.length > 0 && (
-                <div className="sc-table-wrap">
-                  <table className="sc-table">
-                    <thead><tr><th>Batter</th><th className="right">R</th><th className="right">B</th><th className="right">4s</th><th className="right">6s</th></tr></thead>
-                    <tbody>
-                      {innings.batting.map(b => (
-                        <tr key={b.id} className={!b.isOut ? 'on-strike' : ''}>
-                          <td>{b.playerName}{!b.isOut && '*'}</td>
-                          <td className="right" style={{ fontWeight: 700 }}>{b.runs}</td>
-                          <td className="right" style={{ color: 'var(--text-3)' }}>{b.balls}</td>
-                          <td className="right" style={{ color: 'var(--green)' }}>{b.fours}</td>
-                          <td className="right" style={{ color: 'var(--accent)' }}>{b.sixes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {innings?.bowling?.length > 0 && (
-                <div className="sc-table-wrap" style={{ borderTop: '1px solid var(--card-border)' }}>
-                  <table className="sc-table">
-                    <thead><tr><th>Bowler</th><th className="right">O</th><th className="right">R</th><th className="right">W</th></tr></thead>
-                    <tbody>
-                      {innings.bowling.map(b => (
-                        <tr key={b.id}>
-                          <td>{b.playerName}</td>
-                          <td className="right" style={{ color: 'var(--text-3)' }}>{b.overs}</td>
-                          <td className="right">{b.runsConceded}</td>
-                          <td className="right" style={{ color: b.wickets >= 3 ? 'var(--green)' : 'inherit', fontWeight: b.wickets >= 3 ? 700 : 400 }}>{b.wickets}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {!innings?.batting?.length && !innings?.bowling?.length && (
-                <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)' }}>No records yet</div>
-              )}
-            </div>
-          ))}
-
-          {/* Ball-by-ball timeline */}
-          <div className="innings-timeline">
-            <div className="timeline-label">Ball-by-Ball ({activeInnings === 'FIRST' ? match.team1Name : match.team2Name})</div>
-            {[...activeBalls].reverse().slice(0, 20).map(b => (
-              <div key={b.id} className="timeline-item">
-                <div className={`timeline-dot ${b.four || b.six ? 'notable' : b.wicket ? 'wicket-dot' : ''}`} />
-                <div style={{ flex: 1 }}>
-                  <div className="timeline-over">Over {b.overNumber}.{b.ballNumber} · {b.batsmanName || '?'} vs {b.bowlerName || '?'}</div>
-                  <div className="timeline-desc">
-                    {b.wicket ? 'WICKET!' : b.six ? 'SIX!' : b.four ? 'FOUR!' : b.wide ? 'Wide' : b.noBall ? 'No Ball' : b.legBye ? `Leg Bye ${b.runs}` : b.runs === 0 ? 'Dot ball' : `${b.runs} run${b.runs !== 1 ? 's' : ''}`}
-                  </div>
-                </div>
-                <div className={`timeline-runs ${b.wicket ? 'wicket' : ''}`}>
-                  {b.wicket ? 'W' : b.wide ? 'Wd' : b.noBall ? 'Nb' : b.six ? '6' : b.four ? '4' : b.runs === 0 ? '·' : b.runs}
-                </div>
-              </div>
-            ))}
-            {!activeBalls.length && <div style={{ padding: '14px', fontSize: 13, color: 'var(--text-3)' }}>No balls recorded yet</div>}
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="live-console-footer">
-        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          Match #{match.matchNumber} · {match.overs} overs/team · {match.venue}
-        </span>
-        <button className="footer-action-btn" onClick={() => setShowScoreModal(true)}>Match Settings</button>
-        <Link to={`/matches/${id}/scorecard`} className="footer-action-btn" style={{ textDecoration: 'none' }} target="_blank">Full Scorecard</Link>
-      </div>
+      {/* BALL PAD — sticky bottom */}
+      {isLive && !inningsComplete && !chaseWon && (
+        <div style={{ position: 'sticky', bottom: 0, zIndex: 100, flexShrink: 0 }}>
+          {renderBallPad()}
+        </div>
+      )}
 
-      {/* Score Modal */}
+      {/* ---- MODALS ---- */}
+
       {showScoreModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowScoreModal(false)}>
           <div className="modal modal-lg">
@@ -735,7 +965,6 @@ export default function LiveScoring() {
         </div>
       )}
 
-      {/* Batting Modal */}
       {showBatModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowBatModal(false)}>
           <div className="modal modal-md">
@@ -788,7 +1017,6 @@ export default function LiveScoring() {
         </div>
       )}
 
-      {/* Bowling Modal */}
       {showBowlModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowBowlModal(false)}>
           <div className="modal modal-md">
@@ -832,4 +1060,3 @@ export default function LiveScoring() {
     </div>
   );
 }
-

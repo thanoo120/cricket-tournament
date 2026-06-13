@@ -201,6 +201,10 @@ export default function PublicDashboard() {
   const recentMatches   = allMatches.filter(m => m.status === 'COMPLETED').slice().reverse();
   const upcomingMatches = allMatches.filter(m => m.status === 'SCHEDULED');
 
+  // Derive live counts from polled allMatches so deletion is reflected without page reload
+  const liveTotalMatches     = allMatches.length;
+  const liveCompletedMatches = recentMatches.length;
+
   const defaultTab = liveMatches.length > 0 ? 'live' : recentMatches.length > 0 ? 'results' : 'upcoming';
   const activeTab  = tab === 'live' && liveMatches.length === 0 ? defaultTab : tab;
   const tabMatches = activeTab === 'live' ? liveMatches : activeTab === 'results' ? recentMatches : upcomingMatches;
@@ -272,11 +276,11 @@ export default function PublicDashboard() {
             {stats && (
               <div className="pd-hero-stats">
                 <div className="pd-hero-stat">
-                  <div className="pd-hero-stat-val">{stats.totalMatches || 0}</div>
+                  <div className="pd-hero-stat-val">{liveTotalMatches}</div>
                   <div className="pd-hero-stat-lbl">Matches</div>
                 </div>
                 <div className="pd-hero-stat">
-                  <div className="pd-hero-stat-val">{stats.completedMatches || 0}</div>
+                  <div className="pd-hero-stat-val">{liveCompletedMatches}</div>
                   <div className="pd-hero-stat-lbl">Played</div>
                 </div>
                 <div className="pd-hero-stat">
@@ -304,8 +308,8 @@ export default function PublicDashboard() {
         {/* Quick stats strip */}
         {stats && (
           <div className="pd-stats-strip">
-            <StatPill label="Total Matches" value={stats.totalMatches || 0} color="var(--text-1)" />
-            <StatPill label="Completed"     value={stats.completedMatches || 0} color="var(--green)" />
+            <StatPill label="Total Matches" value={liveTotalMatches} color="var(--text-1)" />
+            <StatPill label="Completed"     value={liveCompletedMatches} color="var(--green)" />
             <StatPill label="Total Runs"    value={(stats.totalRuns || 0).toLocaleString()} color="var(--blue)" />
             <StatPill label="Wickets"       value={stats.totalWickets || 0} color="var(--purple)" />
             {liveMatches.length > 0 && <StatPill label="Live Now" value={liveMatches.length} color="var(--red)" />}
