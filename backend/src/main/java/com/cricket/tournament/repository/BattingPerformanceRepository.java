@@ -10,4 +10,5 @@ public interface BattingPerformanceRepository extends JpaRepository<BattingPerfo
     List<BattingPerformance> findByMatchId(Long matchId);
     List<BattingPerformance> findByMatchIdAndInningsType(Long matchId, String inningsType);
     List<BattingPerformance> findByPlayerId(Long playerId);
+    void deleteByMatchId(Long matchId);
 }

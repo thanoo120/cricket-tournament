@@ -69,7 +69,10 @@ export const addBattingPerformance = (data) => API.post('/matches/batting-perfor
 export const addBowlingPerformance = (data) => API.post('/matches/bowling-performance', data);
 export const getTournamentStats = (tournamentId) =>
   API.get(`/matches/tournament/${tournamentId}/stats`);
+export const deleteMatch = (id) => API.delete(`/matches/${id}`);
 export const recordBall = (data) => API.post('/matches/balls', data);
+export const undoLastBall = (matchId, inningsType) =>
+  API.delete(`/matches/${matchId}/balls/last?inningsType=${inningsType}`);
 export const getBalls = (matchId, inningsType) =>
   API.get(`/matches/${matchId}/balls${inningsType ? `?inningsType=${inningsType}` : ''}`);
 

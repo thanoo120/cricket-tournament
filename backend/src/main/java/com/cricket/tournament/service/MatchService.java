@@ -211,11 +211,61 @@ public class MatchService {
         }).collect(Collectors.toList());
     }
 
+    @Transactional
+    public void deleteMatch(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found: " + matchId));
+        ballRepository.deleteByMatchId(matchId);
+        battingRepo.deleteByMatchId(matchId);
+        bowlingRepo.deleteByMatchId(matchId);
+        matchRepository.delete(match);
+    }
+
+    @Transactional
+    public MatchResponse undoLastBall(Long matchId, String inningsType) {
+        Ball last = ballRepository.findTopByMatchIdAndInningsTypeOrderByIdDesc(matchId, inningsType)
+                .orElseThrow(() -> new RuntimeException("No balls recorded for this innings"));
+
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+
+        boolean isFirst = "FIRST".equals(inningsType);
+        int extraPenalty = (last.isWide() || last.isNoBall()) ? 1 : 0;
+        int totalRuns = last.getRuns() + extraPenalty;
+
+        if (isFirst) {
+            match.setTeam1Score(Math.max(0, (match.getTeam1Score() != null ? match.getTeam1Score() : 0) - totalRuns));
+            if (last.isWicket()) match.setTeam1Wickets(Math.max(0, match.getTeam1Wickets() - 1));
+            if (!last.isWide() && !last.isNoBall())
+                match.setTeam1Overs(reverseOvers(match.getTeam1Overs()));
+        } else {
+            match.setTeam2Score(Math.max(0, (match.getTeam2Score() != null ? match.getTeam2Score() : 0) - totalRuns));
+            if (last.isWicket()) match.setTeam2Wickets(Math.max(0, match.getTeam2Wickets() - 1));
+            if (!last.isWide() && !last.isNoBall())
+                match.setTeam2Overs(reverseOvers(match.getTeam2Overs()));
+        }
+
+        ballRepository.delete(last);
+        Match saved = matchRepository.save(match);
+        MatchResponse resp = toResponse(saved);
+        sseService.broadcast(matchId, resp);
+        return resp;
+    }
+
     private double advanceOvers(double current) {
         int wholePart = (int) current;
         int balls = (int) Math.round((current - wholePart) * 10);
         balls++;
         if (balls >= 6) { wholePart++; balls = 0; }
+        return Math.round((wholePart + balls / 10.0) * 10.0) / 10.0;
+    }
+
+    private double reverseOvers(double current) {
+        int wholePart = (int) current;
+        int balls = (int) Math.round((current - wholePart) * 10);
+        balls--;
+        if (balls < 0) { wholePart--; balls = 5; }
+        if (wholePart < 0) return 0.0;
         return Math.round((wholePart + balls / 10.0) * 10.0) / 10.0;
     }
 
@@ -369,6 +419,21 @@ public class MatchService {
         List<BowlingPerformanceResponse> bowl2 = bowlingRepo.findByMatchIdAndInningsType(matchId, "SECOND")
                 .stream().map(this::toBowlingResponse).collect(Collectors.toList());
 
+        List<Ball> balls1 = ballRepository.findByMatchIdAndInningsTypeOrderByOverNumberAscBallNumberAsc(matchId, "FIRST");
+        List<Ball> balls2 = ballRepository.findByMatchIdAndInningsTypeOrderByOverNumberAscBallNumberAsc(matchId, "SECOND");
+        int extras1 = balls1.stream().mapToInt(b -> {
+            int e = 0;
+            if (b.isWide() || b.isNoBall()) e += 1;
+            if (b.isLegBye()) e += b.getRuns();
+            return e;
+        }).sum();
+        int extras2 = balls2.stream().mapToInt(b -> {
+            int e = 0;
+            if (b.isWide() || b.isNoBall()) e += 1;
+            if (b.isLegBye()) e += b.getRuns();
+            return e;
+        }).sum();
+
         InningsData first = null, second = null;
 
         if (!bat1.isEmpty() || !bowl1.isEmpty()) {
@@ -377,7 +442,7 @@ public class MatchService {
             first.setTotal(match.getTeam1Score());
             first.setWickets(match.getTeam1Wickets());
             first.setOvers(match.getTeam1Overs());
-            first.setExtras(0);
+            first.setExtras(extras1);
             first.setBatting(bat1);
             first.setBowling(bowl1);
         }
@@ -388,7 +453,7 @@ public class MatchService {
             second.setTotal(match.getTeam2Score());
             second.setWickets(match.getTeam2Wickets());
             second.setOvers(match.getTeam2Overs());
-            second.setExtras(0);
+            second.setExtras(extras2);
             second.setBatting(bat2);
             second.setBowling(bowl2);
         }

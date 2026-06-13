@@ -73,6 +73,19 @@ public class MatchController {
         return ResponseEntity.ok(matchService.getBalls(id, inningsType));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteMatch(@PathVariable Long id) {
+        matchService.deleteMatch(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/balls/last")
+    public ResponseEntity<MatchResponse> undoLastBall(
+            @PathVariable Long id,
+            @RequestParam String inningsType) {
+        return ResponseEntity.ok(matchService.undoLastBall(id, inningsType));
+    }
+
     @GetMapping(value = "/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable Long id) {
         return sseService.subscribe(id);

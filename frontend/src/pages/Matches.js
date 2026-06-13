@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getMatches, createMatch, updateScore, getTeams } from '../services/api';
+import { getMatches, createMatch, updateScore, getTeams, deleteMatch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const PALETTE = ['#b3261e','#1a73e8','#e37400','#7c3aed','#0097a7','#e91e63','#5d4037','#2e7d32'];
@@ -60,6 +60,12 @@ export default function AdminMatches() {
       load();
     } catch {}
     setSaving(false);
+  };
+
+  const handleDelete = async (match) => {
+    if (!window.confirm(`Delete Match #${match.matchNumber} (${match.team1Name} vs ${match.team2Name})? This cannot be undone.`)) return;
+    await deleteMatch(match.id);
+    load();
   };
 
   const quickStatus = async (match, status) => {
@@ -279,6 +285,13 @@ export default function AdminMatches() {
                         <Link to={`/admin/matches/${m.id}/score`} className="btn btn-primary btn-sm">
                           {isLive ? 'Score Live' : 'Manage'}
                         </Link>
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: 'var(--red-muted)', color: 'var(--red)', border: '1px solid var(--red)' }}
+                          onClick={() => handleDelete(m)}
+                          title="Delete match">
+                          🗑
+                        </button>
                       </>
                     )}
                   </div>

@@ -10,4 +10,5 @@ public interface BowlingPerformanceRepository extends JpaRepository<BowlingPerfo
     List<BowlingPerformance> findByMatchId(Long matchId);
     List<BowlingPerformance> findByMatchIdAndInningsType(Long matchId, String inningsType);
     List<BowlingPerformance> findByPlayerId(Long playerId);
+    void deleteByMatchId(Long matchId);
 }

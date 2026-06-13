@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   getMatch, updateScore, getScorecard, addBattingPerformance, addBowlingPerformance,
-  getPlayers, recordBall, getBalls, getMatches, getTournaments
+  getPlayers, recordBall, getBalls, getMatches, getTournaments, undoLastBall
 } from '../services/api';
 
 const DISMISSAL_TYPES = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket', 'Retired Hurt'];
@@ -24,10 +24,15 @@ export default function LiveScoring() {
   const [loading, setLoading] = useState(!!id);
   const [activeInnings, setActiveInnings] = useState('FIRST');
   const [saving, setSaving] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const [showBatModal, setShowBatModal] = useState(false);
   const [showBowlModal, setShowBowlModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [msg, setMsg] = useState('');
+  // pendingExtra: null | 'wide' | 'noBall' — waiting for scorer to pick extra runs
+  const [pendingExtra, setPendingExtra] = useState(null);
+  // free hit: true after a no-ball, cleared on next legal ball
+  const [freehit, setFreehit] = useState(false);
 
   // Current ball state
   const [strikeBatsman, setStrikeBatsman] = useState('');
@@ -90,6 +95,19 @@ export default function LiveScoring() {
     navigate(`/admin/matches/${matchId}/score`);
   };
 
+  const doUndoLastBall = async () => {
+    if (!window.confirm('Undo the last recorded ball? This will reverse the score.')) return;
+    setUndoing(true);
+    try {
+      await undoLastBall(id, activeInnings);
+      await Promise.all([loadMatchData(id), getBalls(id).then(r => setBalls(r.data || []))]);
+      setPendingExtra(null);
+      setFreehit(false);
+      showMsg('Last ball undone');
+    } catch { showMsg('Nothing to undo'); }
+    setUndoing(false);
+  };
+
   // Compute current over/ball numbers from loaded balls
   useEffect(() => {
     if (!balls.length) return;
@@ -132,6 +150,10 @@ export default function LiveScoring() {
         opts.runs === 6 ? 'SIX!' :
         opts.runs === 0 ? 'Dot ball' :
         `+${opts.runs}`;
+
+      // Track free hit and clear pending extra
+      setPendingExtra(null);
+      setFreehit(!!opts.noBall);
 
       // Strike rotation: odd legal runs = batsmen crossed
       const isLegal   = !opts.wide && !opts.noBall;
@@ -261,6 +283,14 @@ export default function LiveScoring() {
   const maxOvers = match.overs || 3;
   const crr = activeOvers > 0 ? (activeScore / activeOvers).toFixed(2) : '0.00';
 
+  // Innings completion checks
+  const oversComplete = Math.floor(activeOvers) >= maxOvers;
+  const allOut = (activeWickets ?? 0) >= 10;
+  const inningsComplete = isLive && (oversComplete || allOut);
+  // Chase complete: 2nd innings chased down target
+  const target = match.team1Score != null ? match.team1Score + 1 : null;
+  const chaseWon = activeInnings === 'SECOND' && target != null && activeScore >= target;
+
   return (
     <div className="live-console">
       {/* Header */}
@@ -352,44 +382,123 @@ export default function LiveScoring() {
             </div>
           </div>
 
+          {/* Innings completion / chase won alert */}
+          {(inningsComplete || chaseWon) && (
+            <div style={{ background: chaseWon ? 'var(--green)' : 'var(--accent)', color: '#fff', borderRadius: 8, padding: '12px 14px', fontWeight: 700, fontSize: 14, textAlign: 'center', marginBottom: 4 }}>
+              {chaseWon
+                ? `🏆 ${match.team2Name} wins the match!`
+                : allOut
+                  ? `All out! ${match.team1Name || match.team2Name} innings complete.`
+                  : `Over limit reached — innings complete.`}
+              {!chaseWon && activeInnings === 'FIRST' && (
+                <div style={{ marginTop: 6 }}>
+                  <button className="btn btn-sm" style={{ background: '#fff', color: 'var(--accent)', fontWeight: 700 }}
+                    onClick={() => setActiveInnings('SECOND')}>
+                    Switch to 2nd Innings →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Free hit banner */}
+          {freehit && isLive && (
+            <div style={{ background: '#7c3aed', color: '#fff', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>
+              ⚡ FREE HIT — batsman can only be Run Out
+            </div>
+          )}
+
           {/* Ball Pad */}
-          {isLive && (
+          {isLive && !inningsComplete && !chaseWon && (
             <div className="lc-panel">
-              <div className="lc-panel-header"><span className="lc-panel-label">Record Ball — Over {currentOver}, Ball {ballInOver}</span></div>
-              <div className="add-event-pad">
-                <div className="event-grid">
-                  {[0, 1, 2, 3].map(r => (
-                    <button key={r} className="event-btn" disabled={saving} onClick={() => doRecordBall({ runs: r, dot: r === 0 })}>
-                      <span className="event-btn-num">{r}</span>
-                      <span className="event-btn-label">{r === 0 ? 'Dot' : r === 1 ? 'Run' : 'Runs'}</span>
-                    </button>
-                  ))}
-                  <button className="event-btn boundary" disabled={saving} onClick={() => doRecordBall({ runs: 4, four: true })}>
-                    <span className="event-btn-num">4</span>
-                    <span className="event-btn-label">Four</span>
-                  </button>
-                  <button className="event-btn maximum" disabled={saving} onClick={() => doRecordBall({ runs: 6, six: true })}>
-                    <span className="event-btn-num">6</span>
-                    <span className="event-btn-label">Six</span>
-                  </button>
-                </div>
-                <div className="event-extras">
-                  <button className="event-extra-btn" disabled={saving} onClick={() => doRecordBall({ runs: 0, wide: true })}>
-                    <span className="extra-code">WD</span> Wide
-                  </button>
-                  <button className="event-extra-btn" disabled={saving} onClick={() => doRecordBall({ runs: 0, noBall: true })}>
-                    <span className="extra-code">NB</span> No Ball
-                  </button>
-                  <button className="event-extra-btn" disabled={saving} onClick={() => doRecordBall({ runs: 1, legBye: true })}>
-                    <span className="extra-code">LB</span> Leg Bye
-                  </button>
-                  <button className="event-btn wicket-btn" style={{ padding: '8px 6px' }} disabled={saving}
-                    onClick={() => doRecordBall({ runs: 0, wicket: true })}>
-                    <span className="event-btn-num">W</span>
-                    <span className="event-btn-label">Wicket</span>
-                  </button>
-                </div>
+              <div className="lc-panel-header" style={{ justifyContent: 'space-between' }}>
+                <span className="lc-panel-label">
+                  {pendingExtra === 'wide' ? '⚡ Wide — select overthrow runs' :
+                   pendingExtra === 'noBall' ? '⚡ No Ball — select batsman runs' :
+                   `Record Ball — Over ${currentOver}, Ball ${ballInOver}`}
+                </span>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'var(--red-muted)', color: 'var(--red)', border: '1px solid var(--red)', fontSize: 11, padding: '2px 8px' }}
+                  disabled={undoing || saving}
+                  onClick={doUndoLastBall}>
+                  ↩ Undo
+                </button>
               </div>
+
+              {pendingExtra ? (
+                /* Extra runs picker — shown after WD or NB is pressed */
+                <div className="add-event-pad">
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '4px 2px 8px' }}>
+                    {pendingExtra === 'wide'
+                      ? 'Runs from overthrows (wide penalty +1 is automatic):'
+                      : 'Runs scored by batsman (no-ball penalty +1 is automatic):'}
+                  </div>
+                  <div className="event-grid">
+                    {(pendingExtra === 'noBall' ? [0, 1, 2, 3, 4, 6] : [0, 1, 2, 3, 4]).map(r => (
+                      <button key={r} className={`event-btn${r === 4 ? ' boundary' : r === 6 ? ' maximum' : ''}`}
+                        disabled={saving}
+                        onClick={() => doRecordBall({
+                          runs: r,
+                          wide: pendingExtra === 'wide',
+                          noBall: pendingExtra === 'noBall',
+                          four: r === 4, six: r === 6,
+                        })}>
+                        <span className="event-btn-num">{r}</span>
+                        <span className="event-btn-label">{r === 0 ? 'No runs' : r === 1 ? 'Run' : 'Runs'}</span>
+                      </button>
+                    ))}
+                    {/* Run out on wide */}
+                    {pendingExtra === 'wide' && (
+                      <button className="event-btn wicket-btn" disabled={saving}
+                        onClick={() => doRecordBall({ runs: 0, wide: true, wicket: true })}>
+                        <span className="event-btn-num">W</span>
+                        <span className="event-btn-label">Run Out</span>
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setPendingExtra(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                /* Normal ball pad */
+                <div className="add-event-pad">
+                  <div className="event-grid">
+                    {[0, 1, 2, 3].map(r => (
+                      <button key={r} className="event-btn" disabled={saving} onClick={() => doRecordBall({ runs: r, dot: r === 0 })}>
+                        <span className="event-btn-num">{r}</span>
+                        <span className="event-btn-label">{r === 0 ? 'Dot' : r === 1 ? 'Run' : 'Runs'}</span>
+                      </button>
+                    ))}
+                    <button className="event-btn boundary" disabled={saving} onClick={() => doRecordBall({ runs: 4, four: true })}>
+                      <span className="event-btn-num">4</span>
+                      <span className="event-btn-label">Four</span>
+                    </button>
+                    <button className="event-btn maximum" disabled={saving} onClick={() => doRecordBall({ runs: 6, six: true })}>
+                      <span className="event-btn-num">6</span>
+                      <span className="event-btn-label">Six</span>
+                    </button>
+                  </div>
+                  <div className="event-extras">
+                    <button className="event-extra-btn" disabled={saving} onClick={() => setPendingExtra('wide')}>
+                      <span className="extra-code">WD</span> Wide
+                    </button>
+                    <button className="event-extra-btn" disabled={saving} onClick={() => setPendingExtra('noBall')}>
+                      <span className="extra-code">NB</span> No Ball
+                    </button>
+                    <button className="event-extra-btn" disabled={saving} onClick={() => doRecordBall({ runs: 1, legBye: true })}>
+                      <span className="extra-code">LB</span> Leg Bye
+                    </button>
+                    <button className="event-btn wicket-btn" style={{ padding: '8px 6px' }} disabled={saving || freehit}
+                      title={freehit ? 'Free hit — batsman cannot be out except run out' : ''}
+                      onClick={() => doRecordBall({ runs: 0, wicket: true })}>
+                      <span className="event-btn-num">W</span>
+                      <span className="event-btn-label">{freehit ? 'Run Out' : 'Wicket'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
